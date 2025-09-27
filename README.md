@@ -1,15 +1,7 @@
 # WeiWan 任务管理系统
 
-基于 FastAPI + SQLite + Vue3 + TailwindCSS 的现代化任务管理首页应用。
+基于 FastAPI + SQLite + Vue3 + TailwindCSS。
 
-## 项目特性
-
-- 🎯 **任务层级管理**：支持多级任务分解，父子任务关联
-- 📊 **可视化进度**：实时进度图表和完成度统计
-- 📅 **日历视图**：任务时间线展示
-- 🚨 **紧急任务提醒**：智能任务优先级管理
-- 🎨 **现代化UI**：基于TailwindCSS的响应式设计
-- 🔄 **实时数据**：前后端分离架构，数据实时同步
 
 ## 项目架构
 
@@ -50,7 +42,7 @@ frontend/
 │       ├── ProgressChart.vue     # 进度图表组件
 │       ├── UrgentTasks.vue       # 紧急任务列表组件
 │       └── CalendarView.vue      # 日历视图组件
-└── weiwan.html             # 备用HTML文件
+└── weiwan.html             # 原型图HTML文件（backup为备份）
 ```
 
 ### 工具脚本
