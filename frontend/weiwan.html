@@ -1,0 +1,1852 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=.0">
+    <title>深色未来主义生产力仪表板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.7.7/dist/axios.min.js"></script>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(140deg, #2A233B 0%, #1C1B2E 100%);
+            --card-bg: rgba(49, 43, 70, 0.6);
+            --highlight-gradient: linear-gradient(90deg, #E38EFF 0%, #7E57C2 100%);
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: #EAE9F1;
+            margin: 0;
+            height: 100vh;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        .dashboard-container {
+            width: 1440px;
+            height: 100%;
+            margin: 0 auto;
+            display: flex;
+        }
+
+        /* 导航栏样式 */
+        .nav-bar {
+            width: 72px;
+            height: 100vh;
+            background: var(--bg-gradient);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+            position: fixed;
+            border-right: 1px solid rgba(113, 100, 152, 0.3);
+        }
+
+        .nav-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 14px;
+            background: var(--highlight-gradient);
+            margin-bottom: 32px;
+        }
+
+        .nav-icons {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+            flex: 1;
+        }
+
+        .nav-icon {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-icon.active {
+            background: rgba(127, 87, 194, 0.2);
+            box-shadow: 0 0 0 2px transparent;
+            position: relative;
+        }
+
+        .nav-icon.active::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 14px;
+            padding: 2px;
+            background: var(--highlight-gradient);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, 
+                          linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+        }
+
+        .user-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid rgba(227, 142, 255, 0.4);
+            box-shadow: 0 0 12px rgba(227, 142, 255, 0.5);
+            background: #3A3450;
+            overflow: hidden;
+            cursor: pointer;
+            margin-top: auto;
+        }
+
+        .profile-panel {
+            position: fixed;
+            top: 0;
+            left: -420px;
+            width: 420px;
+            height: 100vh;
+            background: linear-gradient(120deg, #2A233B 0%, #202038 100%);
+            box-shadow: 16px 0 30px rgba(0, 0, 0, 0.3);
+            transition: left 0.3s ease-out;
+            z-index: 100;
+            padding: 24px;
+            border-radius: 0 24px 24px 0;
+        }
+
+        .profile-panel.open {
+            left: 72px;
+        }
+
+        .main-content {
+            margin-left: 72px;
+            flex: 1;
+            padding: 28px;
+            overflow-y: auto;
+            scrollbar-width: none;
+        }
+
+        .main-content::-webkit-scrollbar {
+            display: none;
+        }
+
+        .page-section {
+            display: none;
+        }
+
+        .page-section.active {
+            display: block;
+        }
+
+        /* 通用卡片样式 */
+        .card {
+            background: var(--card-bg);
+            border-radius: 24px;
+            border: 1px solid rgba(113, 89, 193, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 24px;
+            padding: 1px;
+            background: var(--highlight-gradient);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, 
+                          linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .pill-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .task-item {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            transition: background 0.2s;
+        }
+
+        .task-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .progress-ring {
+            position: relative;
+            width: 100px;
+            height: 100px;
+        }
+
+        .progress-bg {
+            fill: none;
+            stroke: rgba(127, 87, 194, 0.2);
+        }
+
+        .progress-value {
+            fill: none;
+            stroke: url(#gradient);
+            stroke-linecap: round;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        /* 主页布局 */
+        .home-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 24px;
+            grid-template-areas:
+                "motivation progress"
+                "tasks calendar";
+        }
+
+        .motivation-card {
+            grid-area: motivation;
+            min-height: 240px;
+        }
+
+        .progress-card {
+            grid-area: progress;
+            min-height: 240px;
+        }
+
+        .tasks-card {
+            grid-area: tasks;
+            height: 420px;
+        }
+
+        .calendar-card {
+            grid-area: calendar;
+            height: 420px;
+        }
+
+        /* 任务页面布局 */
+        .task-layout {
+            display: flex;
+            gap: 24px;
+        }
+
+        .sub-nav {
+            width: 120px;
+            background: rgba(43, 38, 64, 0.7);
+            border-radius: 24px;
+            padding: 24px 8px;
+            flex-shrink: 0;
+        }
+
+        .sub-nav-item {
+            padding: 12px;
+            border-radius: 14px;
+            cursor: pointer;
+            margin-bottom: 8px;
+            text-align: center;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .sub-nav-item.active {
+            background: var(--highlight-gradient);
+        }
+
+        .task-content {
+            flex: 1;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-blue { background: #4D7CFF; }
+        .status-gray { background: #5D5A75; }
+        .status-gradient { background: var(--highlight-gradient) !important; }
+
+        .tag-red { background: linear-gradient(90deg, #FF6B8E 0%, #F36C5C 100%); }
+        .tag-orange { background: linear-gradient(90deg, #FFB563 0%, #FF8C5A 100%); }
+        .tag-blue { background: linear-gradient(90deg, #61A0FF 0%, #5D8CFF 100%); }
+        .tag-green { background: linear-gradient(90deg, #4CAF50 0%, #2E7D32 100%); }
+        
+        /* 任务详情展开动画 */
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fade-out {
+            animation: fadeOut 0.3s ease-out forwards;
+        }
+        
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-10px); }
+        }
+
+        .input-field {
+            padding: 14px 20px;
+            background: rgba(61, 54, 89, 0.5);
+            border-radius: 16px;
+            border: 1px solid rgba(113, 100, 152, 0.3);
+            width: 100%;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: var(--highlight-gradient);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 16px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .month-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            padding: 0 16px 16px;
+        }
+        
+        .calendar-day {
+            aspect-ratio: 1/1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+        
+        .calendar-day.today {
+            background: rgba(227, 142, 255, 0.15);
+            box-shadow: 0 0 0 2px rgba(227, 142, 255, 0.4);
+        }
+        
+        /* 加载动画样式 */
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #7E57C2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- 左侧导航栏 -->
+        <nav class="nav-bar">
+            <div class="nav-icons">
+                <div class="nav-icon active" data-page="home">
+                    <iconify-icon icon="solar:home-smile-linear" width="24" height="24"></iconify-icon>
+                </div>
+                <div class="nav-icon" data-page="task">
+                    <iconify-icon icon="solar:list-check-linear" width="24" height="24"></iconify-icon>
+                </div>
+                
+            </div>
+            <div class="user-avatar" id="profile-btn">
+                <img src="https://modao.cc/ai/uploads/ai_pics/27/279260/aigp_1758209513.jpeg" alt="User profile picture" id="1" style="content:url('https://cdn.iconscout.com/icon/free/png-256/free-mouse-animal-zoo-25734.png');">
+            </div>
+        </nav>
+
+        <!-- 右侧主内容区 -->
+        <main class="main-content">
+            <!-- 主页 -->
+            <div id="home" class="page-section active">
+                <div class="home-grid">
+                    <!-- 激励卡片 -->
+                    <div class="card motivation-card">
+                        <div class="card-header">
+                            <h2 class="text-xl font-bold" style="">来自鼠鼠的问候</h2>
+                        </div>
+                        <div class="p-6 flex flex-col items-center justify-center h-3/4">
+                            <p class="text-2xl font-bold mb-4 text-center">"鼠猜你今天可以完成三项任务！"</p>
+                            <div class="text-purple-300">今日完成度: 38% → 目标 65%</div>
+                        </div>
+                    </div>
+
+                    <!-- 进度概览 -->
+                    <div class="card progress-card">
+                        <div class="card-header">
+                            <h2 class="text-xl font-bold">进度概览</h2>
+                        </div>
+                        <div class="p-6 flex items-center justify-around">
+                            <div class="progress-ring">
+                                <svg viewBox="0 0 100 100">
+                                    <defs>
+                                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stop-color="#E38EFF"></stop>
+                                            <stop offset="100%" stop-color="#7E57C2"></stop>
+                                        </linearGradient>
+                                    </defs>
+                                    <circle class="progress-bg" cx="50" cy="50" r="40" stroke-width="6"></circle>
+                                    <circle class="progress-value" cx="50" cy="50" r="40" stroke-width="6" stroke-dasharray="251.2" stroke-dashoffset="75.36"></circle>
+                                    <text x="50" y="52" text-anchor="middle" font-weight="bold" font-size="16">70%</text>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="flex items-center mb-4">
+                                    <div class="status-dot status-gray mr-2"></div>
+                                    <span class="text-sm">未开始 12</span>
+                                </div>
+                                <div class="flex items-center mb-4">
+                                    <div class="status-dot status-blue mr-2"></div>
+                                    <span class="text-sm">进行中 8</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="status-dot status-gradient mr-2"></div>
+                                    <span class="text-sm">已完成 15</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 任务列表 -->
+                    <div class="card tasks-card">
+                        <div class="card-header">
+                            <h2 class="text-xl font-bold">今日紧急任务</h2>
+                        </div>
+                        <div class="overflow-auto" style="height: calc(100% - 63px);">
+                            <div class="task-item">
+                                <div class="flex justify-between">
+                                    <span class="font-medium">季度财务报告分析</span>
+                                    <span class="text-xs flex items-center">
+                                        <div class="status-dot status-blue mr-2"></div>
+                                        进行中
+                                    </span>
+                                </div>
+                                <div class="text-sm text-gray-400 flex items-center mt-2">
+                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                    截止: 今日 18:00
+                                    <span class="ml-3 text-xs pill-badge tag-orange">高优先级</span>
+                                </div>
+                            </div>
+                            <div class="task-item">
+                                <div class="flex justify-between">
+                                    <span class="font-medium">用户调研问卷设计</span>
+                                    <span class="text-xs flex items-center">
+                                        <div class="status-dot status-gray mr-2"></div>
+                                        未开始
+                                    </span>
+                                </div>
+                                <div class="text-sm text-gray-400 flex items-center mt-2">
+                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                    截止: 明日 10:00
+                                    <span class="ml-3 text-xs pill-badge tag-red">紧急</span>
+                                </div>
+                            </div>
+                            <div class="task-item">
+                                <div class="flex justify-between">
+                                    <span class="font-medium">团队项目进度会议</span>
+                                    <span class="text-xs flex items-center">
+                                        <div class="status-dot status-blue mr-2"></div>
+                                        进行中
+                                    </span>
+                                </div>
+                                <div class="text-sm text-gray-400 flex items-center mt-2">
+                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                    开始: 今日 14:30
+                                    <span class="ml-3 text-xs pill-badge tag-blue">会议</span>
+                                </div>
+                            </div>
+                            <div class="task-item">
+                                <div class="flex justify-between">
+                                    <span class="font-medium">技术文档更新</span>
+                                    <span class="text-xs flex items-center">
+                                        <div class="status-dot status-gradient mr-2"></div>
+                                        已完成
+                                    </span>
+                                </div>
+                                <div class="text-sm text-gray-400 flex items-center mt-2">
+                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                    完成于: 今日 11:20
+                                    <span class="ml-3 text-xs pill-badge">文件</span>
+                                </div>
+                            </div>
+                            <div class="task-item">
+                                <div class="flex justify-between">
+                                    <span class="font-medium">产品原型评审</span>
+                                    <span class="text-xs flex items-center">
+                                        <div class="status-dot status-gray mr-2"></div>
+                                        未开始
+                                    </span>
+                                </div>
+                                <div class="text-sm text-gray-400 flex items-center mt-2">
+                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                    计划: 今日 16:00
+                                    <span class="ml-3 text-xs pill-badge tag-orange">重要</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 日历 -->
+                    <div class="card calendar-card">
+                        <div class="card-header">
+                            <h2 class="text-xl font-bold">2023年9月</h2>
+                        </div>
+                        <div class="month-header">
+                            <iconify-icon icon="ph:caret-left" class="cursor-pointer"></iconify-icon>
+                            <span class="font-medium">13日 - 19日</span>
+                            <iconify-icon icon="ph:caret-right" class="cursor-pointer"></iconify-icon>
+                        </div>
+                        <div class="calendar-grid">
+                            <div class="calendar-day text-gray-500">一</div>
+                            <div class="calendar-day text-gray-500">二</div>
+                            <div class="calendar-day text-gray-500">三</div>
+                            <div class="calendar-day text-gray-500">四</div>
+                            <div class="calendar-day text-gray-500">五</div>
+                            <div class="calendar-day text-gray-500">六</div>
+                            <div class="calendar-day text-gray-500">日</div>
+                            
+                            <div class="calendar-day"></div>
+                            <div class="calendar-day"></div>
+                            <div class="calendar-day"></div>
+                            <div class="calendar-day">1</div>
+                            <div class="calendar-day">2</div>
+                            <div class="calendar-day">3</div>
+                            <div class="calendar-day">4</div>
+                            
+                            <div class="calendar-day">5</div>
+                            <div class="calendar-day">6</div>
+                            <div class="calendar-day">7</div>
+                            <div class="calendar-day">8</div>
+                            <div class="calendar-day">9</div>
+                            <div class="calendar-day">10</div>
+                            <div class="calendar-day">11</div>
+                            
+                            <div class="calendar-day">12</div>
+                            <div class="calendar-day today">13</div>
+                            <div class="calendar-day">14</div>
+                            <div class="calendar-day">15</div>
+                            <div class="calendar-day">16</div>
+                            <div class="calendar-day">17</div>
+                            <div class="calendar-day">18</div>
+                            
+                            <div class="calendar-day">19</div>
+                            <div class="calendar-day">20</div>
+                            <div class="calendar-day">21</div>
+                            <div class="calendar-day">22</div>
+                            <div class="calendar-day">23</div>
+                            <div class="calendar-day">24</div>
+                            <div class="calendar-day">25</div>
+                        </div>
+                    </div>
+                    
+                    
+                </div>
+            </div>
+
+            <!-- 任务页面 -->
+            <div id="task" class="page-section">
+                <div class="task-layout">
+                    <div class="sub-nav">
+                        <div class="sub-nav-item active" id="add-task-tab" style="text-align: center;">添加任务</div>
+                        <div class="sub-nav-item" id="history-tab" style="">任务历史</div>
+                    </div>
+                    
+                    <div class="task-content" id="add-task-content">
+                        <h1 class="text-2xl font-bold mb-6">任务管理</h1>
+                        <div class="flex items-start gap-4 mb-6">
+                            <div class="flex-1">
+                                <input type="text" placeholder="添加新任务..." class="input-field">
+                                <div class="mt-3">
+                                    <label class="text-sm text-gray-300 mb-1 block">截止日期：</label>
+                                    <div class="flex gap-2">
+                                        <select class="input-field" style="padding: 10px 16px; flex: 1;">
+                                            <option value="" disabled="" selected="">小时</option>
+                                            <option value="0">00时</option>
+                                            <option value="1">01时</option>
+                                            <option value="2">02时</option>
+                                            <option value="3">03时</option>
+                                            <option value="4">04时</option>
+                                            <option value="5">05时</option>
+                                            <option value="6">06时</option>
+                                            <option value="7">07时</option>
+                                            <option value="8">08时</option>
+                                            <option value="9">09时</option>
+                                            <option value="10">10时</option>
+                                            <option value="11">11时</option>
+                                            <option value="12">12时</option>
+                                            <option value="13">13时</option>
+                                            <option value="14">14时</option>
+                                            <option value="15">15时</option>
+                                            <option value="16">16时</option>
+                                            <option value="17">17时</option>
+                                            <option value="18">18时</option>
+                                            <option value="19">19时</option>
+                                            <option value="20">20时</option>
+                                            <option value="21">21时</option>
+                                            <option value="22">22时</option>
+                                            <option value="23">23时</option>
+                                        </select>
+                                        <select class="input-field" style="padding: 10px 16px; flex: 1;">
+                                            <option value="" disabled="" selected="">日</option>
+                                            <option value="1">1</option>
+                                            <option value="2">2</option>
+                                            <option value="3">3</option>
+                                            <option value="4">4</option>
+                                            <option value="5">5</option>
+                                            <option value="6">6</option>
+                                            <option value="7">7</option>
+                                            <option value="8">8</option>
+                                            <option value="9">9</option>
+                                            <option value="10">10</option>
+                                            <option value="11">11</option>
+                                            <option value="12">12</option>
+                                            <option value="13">13</option>
+                                            <option value="14">14</option>
+                                            <option value="15">15</option>
+                                            <option value="16">16</option>
+                                            <option value="17">17</option>
+                                            <option value="18">18</option>
+                                            <option value="19">19</option>
+                                            <option value="20">20</option>
+                                            <option value="21">21</option>
+                                            <option value="22">22</option>
+                                            <option value="23">23</option>
+                                            <option value="24">24</option>
+                                            <option value="25">25</option>
+                                            <option value="26">26</option>
+                                            <option value="27">27</option>
+                                            <option value="28">28</option>
+                                            <option value="29">29</option>
+                                            <option value="30">30</option>
+                                            <option value="31">31</option>
+                                        </select>
+                                        <select class="input-field" style="padding: 10px 16px; flex: 1;">
+                                            <option value="" disabled="" selected="">月</option>
+                                            <option value="1">1月</option>
+                                            <option value="2">2月</option>
+                                            <option value="3">3月</option>
+                                            <option value="4">4月</option>
+                                            <option value="5">5月</option>
+                                            <option value="6">6月</option>
+                                            <option value="7">7月</option>
+                                            <option value="8">8月</option>
+                                            <option value="9">9月</option>
+                                            <option value="10">10月</option>
+                                            <option value="11">11月</option>
+                                            <option value="12">12月</option>
+                                        </select>
+                                        <select class="input-field" style="padding: 10px 16px; flex: 1;">
+                                            <option value="" disabled="" selected="">年</option>
+                                            <option value="2023">2023</option>
+                                            <option value="2024">2024</option>
+                                            <option value="2025">2025</option>
+                                            <option value="2026">2026</option>
+                                            <option value="2027">2027</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn-primary" id="add-task-btn">添加任务</button>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="font-semibold">我的任务 (7)</h3>
+                            </div>
+                            <div class="overflow-auto" style="max-height: 540px;">
+                                <div class="task-item" data-task-id="task-1">
+                                    <div class="flex justify-between items-start cursor-pointer task-header">
+                                        <div>
+                                            <div class="font-medium mb-1">新UI组件库开发</div>
+                                            <div class="text-sm text-gray-400 flex">
+                                                <span class="mr-3 flex items-center">
+                                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                                    剩余2天
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <iconify-icon icon="ph:git-branch" class="mr-1"></iconify-icon>
+                                                    Design System
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="text-xs flex items-center mb-1">
+                                                <div class="status-dot status-blue mr-2"></div>
+                                                进行中
+                                            </div>
+                                            <div class="pill-badge tag-blue">开发</div>
+                                        </div>
+                                    </div>
+                                    <!-- 任务详情展开内容 -->
+                                    <div class="task-detail hidden mt-4 animate-fade-in">
+                                        <div class="border-t border-purple-500/30 pt-4">
+                                            <div class="flex items-start">
+                                                <!-- 左侧：环形进度条 -->
+                                                <div class="mr-6">
+                                                    <div class="progress-ring relative">
+                                                        <svg viewBox="0 0 100 100" width="120" height="120">
+                                                            <circle class="progress-bg" cx="50" cy="50" r="40" stroke-width="8"></circle>
+                                                            <circle class="progress-value" cx="50" cy="50" r="40" stroke-width="8" stroke-dasharray="251.2" stroke-dashoffset="125.6"></circle>
+                                                            <text x="50" y="45" text-anchor="middle" font-size="10" fill="#a78bfa">截止日期</text>
+                                                            <text x="50" y="60" text-anchor="middle" font-weight="bold" font-size="12">9月15日</text>
+                                                        </svg>
+                                                        <div class="absolute top-0 right-0 bg-purple-600/20 rounded-full p-1">
+                                                            <div class="text-xs font-bold">50%</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!-- 右侧：任务层级 -->
+                                                <div class="flex-1">
+                                                    <h3 class="text-lg font-bold mb-4">新UI组件库开发</h3>
+                                                    
+                                                    <!-- 一级任务 -->
+                                                    <div class="mb-4">
+                                                        <div class="flex items-center mb-2" oncontextmenu="showContextMenu(event, this)" ondblclick="makeItemDraggable(this)">
+                                                            <div class="w-4 h-4 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 mr-2"></div>
+                                                            <span class="font-medium task-item-label" draggable="false">基础组件开发</span>
+                                                            <span class="ml-auto text-xs pill-badge status-gradient">60%</span>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">按钮组件</span>
+                                                                <span class="ml-auto text-xs pill-badge tag-green">已完成</span>
+                                                            </div>
+                                                            
+                                                            <!-- 三级任务 -->
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>普通按钮样式</span>
+                                                                    <iconify-icon class="ml-auto" icon="material-symbols:check-small" color="#22c55e"></iconify-icon>
+                                                                </div>
+                                                            </div>
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>图标按钮样式</span>
+                                                                    <iconify-icon class="ml-auto" icon="material-symbols:check-small" color="#22c55e"></iconify-icon>
+                                                                </div>
+                                                            </div>
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>按钮组合</span>
+                                                                    <iconify-icon class="ml-auto" icon="material-symbols:check-small" color="#22c55e"></iconify-icon>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">表单组件</span>
+                                                                <span class="ml-auto text-xs pill-badge tag-blue">进行中</span>
+                                                            </div>
+                                                            
+                                                            <!-- 三级任务 -->
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>输入框</span>
+                                                                    <iconify-icon class="ml-auto" icon="material-symbols:check-small" color="#22c55e"></iconify-icon>
+                                                                </div>
+                                                            </div>
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>选择器</span>
+                                                                    <div class="ml-auto w-3 h-3 rounded-full border-2 border-blue-500"></div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>复选框和单选框</span>
+                                                                    <div class="ml-auto w-3 h-3 rounded-full border-2 border-gray-500"></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <!-- 一级任务 -->
+                                                    <div class="mb-2">
+                                                        <div class="flex items-center mb-2">
+                                                            <div class="w-4 h-4 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 mr-2"></div>
+                                                            <span class="font-medium">复合组件开发</span>
+                                                            <span class="ml-auto text-xs pill-badge">0%</span>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">导航组件</span>
+                                                                <span class="ml-auto text-xs pill-badge">未开始</span>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">卡片组件</span>
+                                                                <span class="ml-auto text-xs pill-badge">未开始</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- 任务操作区 -->
+                                            <div class="flex justify-end gap-2 mt-4">
+                                                <button class="px-3 py-1 bg-purple-600/20 text-purple-300 rounded-md text-sm">
+                                                    <iconify-icon icon="solar:edit-linear" class="mr-1"></iconify-icon>编辑
+                                                </button>
+                                                <button class="px-3 py-1 bg-purple-600/20 text-purple-300 rounded-md text-sm">
+                                                    <iconify-icon icon="solar:check-circle-linear" class="mr-1"></iconify-icon>完成
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="task-item" data-task-id="task-2">
+                                    <div class="flex justify-between items-start cursor-pointer task-header">
+                                        <div>
+                                            <div class="font-medium mb-1">数据可视化大屏升级</div>
+                                            <div class="text-sm text-gray-400 flex">
+                                                <span class="mr-3 flex items-center">
+                                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                                    剩余4天
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <iconify-icon icon="ph:git-branch" class="mr-1"></iconify-icon>
+                                                    Dashboard
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="text-xs flex items-center mb-1">
+                                                <div class="status-dot status-blue mr-2"></div>
+                                                进行中
+                                            </div>
+                                            <div class="pill-badge">优化</div>
+                                        </div>
+                                    </div>
+                                    <!-- 任务详情展开内容 -->
+                                    <div class="task-detail hidden mt-4 animate-fade-in">
+                                        <div class="border-t border-purple-500/30 pt-4">
+                                            <div class="flex items-start">
+                                                <!-- 左侧：环形进度条 -->
+                                                <div class="mr-6">
+                                                    <div class="progress-ring relative">
+                                                        <svg viewBox="0 0 100 100" width="120" height="120">
+                                                            <circle class="progress-bg" cx="50" cy="50" r="40" stroke-width="8"></circle>
+                                                            <circle class="progress-value" cx="50" cy="50" r="40" stroke-width="8" stroke-dasharray="251.2" stroke-dashoffset="100.5"></circle>
+                                                            <text x="50" y="45" text-anchor="middle" font-size="10" fill="#a78bfa">截止日期</text>
+                                                            <text x="50" y="60" text-anchor="middle" font-weight="bold" font-size="12">9月17日</text>
+                                                        </svg>
+                                                        <div class="absolute top-0 right-0 bg-purple-600/20 rounded-full p-1">
+                                                            <div class="text-xs font-bold">60%</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!-- 右侧：任务层级 -->
+                                                <div class="flex-1">
+                                                    <h3 class="text-lg font-bold mb-4">数据可视化大屏升级</h3>
+                                                    
+                                                    <!-- 一级任务 -->
+                                                    <div class="mb-4">
+                                                        <div class="flex items-center mb-2">
+                                                            <div class="w-4 h-4 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 mr-2"></div>
+                                                            <span class="font-medium">性能优化</span>
+                                                            <span class="ml-auto text-xs pill-badge status-gradient">75%</span>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">图表渲染优化</span>
+                                                                <span class="ml-auto text-xs pill-badge tag-green">已完成</span>
+                                                            </div>
+                                                            
+                                                            <!-- 三级任务 -->
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>减少重绘次数</span>
+                                                                    <iconify-icon class="ml-auto" icon="material-symbols:check-small" color="#22c55e"></iconify-icon>
+                                                                </div>
+                                                            </div>
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>数据预处理</span>
+                                                                    <iconify-icon class="ml-auto" icon="material-symbols:check-small" color="#22c55e"></iconify-icon>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">资源加载优化</span>
+                                                                <span class="ml-auto text-xs pill-badge tag-blue">进行中</span>
+                                                            </div>
+                                                            
+                                                            <!-- 三级任务 -->
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>懒加载实现</span>
+                                                                    <iconify-icon class="ml-auto" icon="material-symbols:check-small" color="#22c55e"></iconify-icon>
+                                                                </div>
+                                                            </div>
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>资源压缩</span>
+                                                                    <div class="ml-auto w-3 h-3 rounded-full border-2 border-blue-500"></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <!-- 一级任务 -->
+                                                    <div class="mb-2">
+                                                        <div class="flex items-center mb-2">
+                                                            <div class="w-4 h-4 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 mr-2"></div>
+                                                            <span class="font-medium">视觉升级</span>
+                                                            <span class="ml-auto text-xs pill-badge">45%</span>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">主题更新</span>
+                                                                <span class="ml-auto text-xs pill-badge tag-blue">进行中</span>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">交互动效</span>
+                                                                <span class="ml-auto text-xs pill-badge">未开始</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- 任务操作区 -->
+                                            <div class="flex justify-end gap-2 mt-4">
+                                                <button class="px-3 py-1 bg-purple-600/20 text-purple-300 rounded-md text-sm">
+                                                    <iconify-icon icon="solar:edit-linear" class="mr-1"></iconify-icon>编辑
+                                                </button>
+                                                <button class="px-3 py-1 bg-purple-600/20 text-purple-300 rounded-md text-sm">
+                                                    <iconify-icon icon="solar:check-circle-linear" class="mr-1"></iconify-icon>完成
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="task-item" data-task-id="task-3">
+                                    <div class="flex justify-between items-start cursor-pointer task-header">
+                                        <div>
+                                            <div class="font-medium mb-1">用户画像分析报告</div>
+                                            <div class="text-sm text-gray-400 flex">
+                                                <span class="mr-3 flex items-center">
+                                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                                    今天截止
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <iconify-icon icon="ph:git-branch" class="mr-1"></iconify-icon>
+                                                    Marketing
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="text-xs flex items-center mb-1">
+                                                <div class="status-dot status-gray mr-2"></div>
+                                                未开始
+                                            </div>
+                                            <div class="pill-badge tag-red">紧急</div>
+                                        </div>
+                                    </div>
+                                    <!-- 任务详情展开内容 -->
+                                    <div class="task-detail hidden mt-4 animate-fade-in">
+                                        <div class="border-t border-purple-500/30 pt-4">
+                                            <div class="flex items-start">
+                                                <!-- 左侧：环形进度条 -->
+                                                <div class="mr-6">
+                                                    <div class="progress-ring relative">
+                                                        <svg viewBox="0 0 100 100" width="120" height="120">
+                                                            <circle class="progress-bg" cx="50" cy="50" r="40" stroke-width="8"></circle>
+                                                            <circle class="progress-value" cx="50" cy="50" r="40" stroke-width="8" stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
+                                                            <text x="50" y="45" text-anchor="middle" font-size="10" fill="#a78bfa">截止日期</text>
+                                                            <text x="50" y="60" text-anchor="middle" font-weight="bold" font-size="12">今天</text>
+                                                        </svg>
+                                                        <div class="absolute top-0 right-0 bg-purple-600/20 rounded-full p-1">
+                                                            <div class="text-xs font-bold">0%</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!-- 右侧：任务层级 -->
+                                                <div class="flex-1">
+                                                    <h3 class="text-lg font-bold mb-4">用户画像分析报告</h3>
+                                                    
+                                                    <!-- 一级任务 -->
+                                                    <div class="mb-4">
+                                                        <div class="flex items-center mb-2">
+                                                            <div class="w-4 h-4 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 mr-2"></div>
+                                                            <span class="font-medium">数据收集与预处理</span>
+                                                            <span class="ml-auto text-xs pill-badge">0%</span>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">行为数据提取</span>
+                                                                <span class="ml-auto text-xs pill-badge">未开始</span>
+                                                            </div>
+                                                            
+                                                            <!-- 三级任务 -->
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>页面访问数据</span>
+                                                                    <div class="ml-auto w-3 h-3 rounded-full border-2 border-gray-500"></div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>用户交互数据</span>
+                                                                    <div class="ml-auto w-3 h-3 rounded-full border-2 border-gray-500"></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">属性数据整理</span>
+                                                                <span class="ml-auto text-xs pill-badge">未开始</span>
+                                                            </div>
+                                                            
+                                                            <!-- 三级任务 -->
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>用户基础信息</span>
+                                                                    <div class="ml-auto w-3 h-3 rounded-full border-2 border-gray-500"></div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>消费行为数据</span>
+                                                                    <div class="ml-auto w-3 h-3 rounded-full border-2 border-gray-500"></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <!-- 一级任务 -->
+                                                    <div class="mb-2">
+                                                        <div class="flex items-center mb-2">
+                                                            <div class="w-4 h-4 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 mr-2"></div>
+                                                            <span class="font-medium">报告撰写</span>
+                                                            <span class="ml-auto text-xs pill-badge">0%</span>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">用户分群分析</span>
+                                                                <span class="ml-auto text-xs pill-badge">未开始</span>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">行为路径分析</span>
+                                                                <span class="ml-auto text-xs pill-badge">未开始</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- 任务操作区 -->
+                                            <div class="flex justify-end gap-2 mt-4">
+                                                <button class="px-3 py-1 bg-purple-600/20 text-purple-300 rounded-md text-sm">
+                                                    <iconify-icon icon="solar:edit-linear" class="mr-1"></iconify-icon>编辑
+                                                </button>
+                                                <button class="px-3 py-1 bg-purple-600/20 text-purple-300 rounded-md text-sm">
+                                                    <iconify-icon icon="solar:check-circle-linear" class="mr-1"></iconify-icon>完成
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="task-item" data-task-id="task-4">
+                                    <div class="flex justify-between items-start cursor-pointer task-header">
+                                        <div>
+                                            <div class="font-medium mb-1">新员工入职培训材料</div>
+                                            <div class="text-sm text-gray-400 flex">
+                                                <span class="mr-3 flex items-center">
+                                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                                    剩余7天
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <iconify-icon icon="ph:git-branch" class="mr-1"></iconify-icon>
+                                                    HR
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="text-xs flex items-center mb-1">
+                                                <div class="status-dot status-gray mr-2"></div>
+                                                未开始
+                                            </div>
+                                            <div class="pill-badge">文档</div>
+                                        </div>
+                                    </div>
+                                    <!-- 任务详情展开内容 -->
+                                    <div class="task-detail hidden mt-4 animate-fade-in">
+                                        <div class="border-t border-purple-500/30 pt-4">
+                                            <div class="flex items-start">
+                                                <!-- 左侧：环形进度条 -->
+                                                <div class="mr-6">
+                                                    <div class="progress-ring relative">
+                                                        <svg viewBox="0 0 100 100" width="120" height="120">
+                                                            <circle class="progress-bg" cx="50" cy="50" r="40" stroke-width="8"></circle>
+                                                            <circle class="progress-value" cx="50" cy="50" r="40" stroke-width="8" stroke-dasharray="251.2" stroke-dashoffset="238.6"></circle>
+                                                            <text x="50" y="45" text-anchor="middle" font-size="10" fill="#a78bfa">截止日期</text>
+                                                            <text x="50" y="60" text-anchor="middle" font-weight="bold" font-size="12">9月20日</text>
+                                                        </svg>
+                                                        <div class="absolute top-0 right-0 bg-purple-600/20 rounded-full p-1">
+                                                            <div class="text-xs font-bold">5%</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!-- 右侧：任务层级 -->
+                                                <div class="flex-1">
+                                                    <h3 class="text-lg font-bold mb-4">新员工入职培训材料</h3>
+                                                    
+                                                    <!-- 一级任务 -->
+                                                    <div class="mb-4">
+                                                        <div class="flex items-center mb-2">
+                                                            <div class="w-4 h-4 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 mr-2"></div>
+                                                            <span class="font-medium">基础培训材料</span>
+                                                            <span class="ml-auto text-xs pill-badge status-gradient">10%</span>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">公司介绍</span>
+                                                                <span class="ml-auto text-xs pill-badge tag-blue">进行中</span>
+                                                            </div>
+                                                            
+                                                            <!-- 三级任务 -->
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>公司历史与文化</span>
+                                                                    <iconify-icon class="ml-auto" icon="material-symbols:check-small" color="#22c55e"></iconify-icon>
+                                                                </div>
+                                                            </div>
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>组织架构介绍</span>
+                                                                    <div class="ml-auto w-3 h-3 rounded-full border-2 border-blue-500"></div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="pl-5 mb-1 text-xs text-gray-400">
+                                                                <div class="flex items-center">
+                                                                    <div class="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                                                                    <span>企业价值观</span>
+                                                                    <div class="ml-auto w-3 h-3 rounded-full border-2 border-gray-500"></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">规章制度</span>
+                                                                <span class="ml-auto text-xs pill-badge">未开始</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <!-- 一级任务 -->
+                                                    <div class="mb-4">
+                                                        <div class="flex items-center mb-2">
+                                                            <div class="w-4 h-4 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 mr-2"></div>
+                                                            <span class="font-medium">岗位专业培训</span>
+                                                            <span class="ml-auto text-xs pill-badge">0%</span>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">技术部门培训材料</span>
+                                                                <span class="ml-auto text-xs pill-badge">未开始</span>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">产品部门培训材料</span>
+                                                                <span class="ml-auto text-xs pill-badge">未开始</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <!-- 一级任务 -->
+                                                    <div class="mb-2">
+                                                        <div class="flex items-center mb-2">
+                                                            <div class="w-4 h-4 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 mr-2"></div>
+                                                            <span class="font-medium">培训计划与安排</span>
+                                                            <span class="ml-auto text-xs pill-badge">0%</span>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6 mb-2">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">培训日程安排</span>
+                                                                <span class="ml-auto text-xs pill-badge">未开始</span>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <!-- 二级任务 -->
+                                                        <div class="pl-6">
+                                                            <div class="flex items-center mb-1">
+                                                                <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                                                <span class="font-medium text-sm">导师分配方案</span>
+                                                                <span class="ml-auto text-xs pill-badge">未开始</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- 任务操作区 -->
+                                            <div class="flex justify-end gap-2 mt-4">
+                                                <button class="px-3 py-1 bg-purple-600/20 text-purple-300 rounded-md text-sm">
+                                                    <iconify-icon icon="solar:edit-linear" class="mr-1"></iconify-icon>编辑
+                                                </button>
+                                                <button class="px-3 py-1 bg-purple-600/20 text-purple-300 rounded-md text-sm">
+                                                    <iconify-icon icon="solar:check-circle-linear" class="mr-1"></iconify-icon>完成
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="task-item">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <div class="font-medium mb-1">性能优化提案</div>
+                                            <div class="text-sm text-gray-400 flex">
+                                                <span class="mr-3 flex items-center">
+                                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                                    剩余3天
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <iconify-icon icon="ph:git-branch" class="mr-1"></iconify-icon>
+                                                    Backend
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="text-xs flex items-center mb-1">
+                                                <div class="status-dot status-blue mr-2"></div>
+                                                进行中
+                                            </div>
+                                            <div class="pill-badge tag-orange">重要</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 历史任务页面 -->
+                    <div class="task-content hidden" id="history-content">
+                        <h1 class="text-2xl font-bold mb-6">任务历史</h1>
+                        
+                        <!-- 统计卡片 -->
+                        <div class="card mb-6">
+                            <div class="card-header">
+                                <h3 class="font-semibold">今日（2023年9月13日）截止统计</h3>
+                            </div>
+                            <div class="p-6">
+                                <div class="flex items-center justify-center gap-8 mb-8">
+                                    <div class="text-center">
+                                        <div class="text-4xl font-bold mb-2 text-green-400">5</div>
+                                        <div class="text-sm text-gray-400">提前完成</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="text-4xl font-bold mb-2 text-blue-400">3</div>
+                                        <div class="text-sm text-gray-400">卡点完成</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="text-4xl font-bold mb-2 text-red-400">2</div>
+                                        <div class="text-sm text-gray-400">未准时完成</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 鼠鼠的提醒 -->
+                                <div class="bg-gradient-to-r from-purple-900/40 to-indigo-900/40 rounded-xl p-4 border border-purple-500/30">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
+                                            <iconify-icon icon="ph:mouse" width="24" height="24"></iconify-icon>
+                                        </div>
+                                        <div>
+                                            <p class="text-lg font-medium">鼠鼠提醒</p>
+                                            <p class="text-sm text-gray-300">有5项任务提前完成，有3项任务卡点完成，但是2项未准时完成，是否还要再添加一遍这些任务呢？</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 历史任务列表 -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="font-semibold">历史任务记录</h3>
+                            </div>
+                            <div class="overflow-auto" style="max-height: 460px;">
+                                <div class="task-item">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <div class="font-medium mb-1">季度财务报告分析</div>
+                                            <div class="text-sm text-gray-400 flex">
+                                                <span class="mr-3 flex items-center">
+                                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                                    提前1天完成
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <iconify-icon icon="ph:calendar" class="mr-1"></iconify-icon>
+                                                    2023-09-12
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="pill-badge tag-green">提前完成</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="task-item">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <div class="font-medium mb-1">用户调研问卷设计</div>
+                                            <div class="text-sm text-gray-400 flex">
+                                                <span class="mr-3 flex items-center">
+                                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                                    卡点完成
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <iconify-icon icon="ph:calendar" class="mr-1"></iconify-icon>
+                                                    2023-09-13
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="pill-badge tag-blue">卡点完成</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="task-item">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <div class="font-medium mb-1">技术文档更新</div>
+                                            <div class="text-sm text-gray-400 flex">
+                                                <span class="mr-3 flex items-center">
+                                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                                    提前3小时完成
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <iconify-icon icon="ph:calendar" class="mr-1"></iconify-icon>
+                                                    2023-09-13
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="pill-badge tag-green">提前完成</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="task-item">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <div class="font-medium mb-1">产品原型评审</div>
+                                            <div class="text-sm text-gray-400 flex">
+                                                <span class="mr-3 flex items-center">
+                                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                                    延迟2小时
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <iconify-icon icon="ph:calendar" class="mr-1"></iconify-icon>
+                                                    2023-09-13
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="pill-badge tag-red">未准时完成</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="task-item">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <div class="font-medium mb-1">团队项目进度会议</div>
+                                            <div class="text-sm text-gray-400 flex">
+                                                <span class="mr-3 flex items-center">
+                                                    <iconify-icon icon="ph:clock" class="mr-1"></iconify-icon>
+                                                    准时完成
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <iconify-icon icon="ph:calendar" class="mr-1"></iconify-icon>
+                                                    2023-09-13
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="pill-badge tag-blue">卡点完成</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 个人资料页（左侧滑出面板） -->
+            <div id="profile" class="profile-panel">
+                <div class="flex justify-between items-center mb-10">
+                    <h1 class="text-2xl font-bold">个人资料</h1>
+                    <iconify-icon icon="ph:x" width="24" height="24" class="cursor-pointer" id="close-profile"></iconify-icon>
+                </div>
+                
+                <div class="flex flex-col items-center justify-center mb-10">
+                    <div class="relative w-28 h-28 rounded-full border-2" style="background: linear-gradient(45deg, #E38EFF, #7E57C2); padding: 4px; margin-bottom: 16px;">
+                        <img src="https://modao.cc/ai/uploads/ai_pics/27/279261/aigp_1758209515.jpeg" alt="User Avatar" class="w-full h-full rounded-full bg-purple-800" id="2">
+                    </div>
+                    <div class="text-center">
+                        <h2 class="text-xl font-bold">张伟</h2>
+                        <p class="text-gray-400">高级产品设计师</p>
+                    </div>
+                </div>
+                
+                <div class="card mb-6">
+                    <div class="p-6">
+                        <div class="flex justify-between mb-3">
+                            <span class="font-medium">级别进度</span>
+                            <span>Lv. 7</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-3 mb-2">
+                            <div class="bg-gradient-to-r from-purple-500 to-indigo-600 h-3 rounded-full" style="width: 65%"></div>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-400">
+                            <span>4800 Exp</span>
+                            <span>7500 Exp</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="font-bold">本周数据</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="flex justify-between py-3 border-b border-gray-700">
+                            <span>任务完成率</span>
+                            <span class="font-medium text-purple-400">78%</span>
+                        </div>
+                        <div class="flex justify-between py-3 border-b border-gray-700">
+                            <span>专注时间</span>
+                            <span class="font-medium">29小时</span>
+                        </div>
+                        <div class="flex justify-between py-3">
+                            <span>效率评分</span>
+                            <span class="font-medium text-purple-400">4.8/5.0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="btn-primary w-full mt-8">更新资料</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- 加载中弹出层 -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden flex items-center justify-center">
+        <div class="bg-[#2A233B] rounded-2xl p-8 flex flex-col items-center shadow-xl border border-purple-500">
+            <div class="loading-spinner mb-4"></div>
+            <p class="text-lg font-medium text-white">加载中...</p>
+        </div>
+    </div>
+    
+    <!-- 右键菜单 -->
+    <div id="context-menu" class="fixed bg-[#2A233B] rounded-lg shadow-xl border border-purple-500/40 p-2 z-50 hidden" style="min-width: 150px;">
+        <div class="context-menu-item flex items-center p-2 hover:bg-purple-600/20 rounded cursor-pointer" onclick="deleteItem()">
+            <iconify-icon icon="solar:trash-bin-trash-linear" class="mr-2"></iconify-icon>
+            <span>删除</span>
+        </div>
+        <div class="context-menu-item flex items-center p-2 hover:bg-purple-600/20 rounded cursor-pointer" onclick="addItem()">
+            <iconify-icon icon="solar:add-circle-linear" class="mr-2"></iconify-icon>
+            <span>添加</span>
+        </div>
+        <div class="context-menu-item flex items-center p-2 hover:bg-purple-600/20 rounded cursor-pointer" onclick="aiAnalyze()">
+            <iconify-icon icon="solar:smart-home-angle-broken" class="mr-2"></iconify-icon>
+            <span>AI拆解</span>
+        </div>
+    </div>
+
+    <script>
+        // 右键菜单相关变量
+        let contextMenu = null;
+        let currentTarget = null;
+        let isDragging = false;
+        let draggedItem = null;
+        let placeholder = null;
+        let initialY = 0;
+        
+        // 添加任务展开/收起功能
+        document.addEventListener('DOMContentLoaded', () => {
+            contextMenu = document.getElementById('context-menu');
+            
+            // 点击页面其他区域关闭右键菜单
+            document.addEventListener('click', (e) => {
+                if (contextMenu && !contextMenu.contains(e.target)) {
+                    contextMenu.classList.add('hidden');
+                }
+            });
+            document.querySelectorAll('.task-header').forEach(header => {
+                header.addEventListener('click', () => {
+                    const taskItem = header.closest('.task-item');
+                    const taskDetail = taskItem.querySelector('.task-detail');
+                    
+                    // 关闭其他已展开的任务详情
+                    document.querySelectorAll('.task-detail:not(.hidden)').forEach(detail => {
+                        if (detail !== taskDetail) {
+                            detail.classList.add('hidden');
+                        }
+                    });
+                    
+                    // 切换当前任务的展开/收起状态
+                    taskDetail.classList.toggle('hidden');
+                    
+                    // 如果任务详情已展开，滚动到该任务位置
+                    if (!taskDetail.classList.contains('hidden')) {
+                        setTimeout(() => {
+                            taskItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 100);
+                    }
+                });
+            });
+        });
+
+        // 页面切换逻辑
+        document.querySelectorAll('.nav-icon').forEach(icon => {
+            icon.addEventListener('click', () => {
+                document.querySelectorAll('.nav-icon').forEach(i => i.classList.remove('active'));
+                icon.classList.add('active');
+                
+                const pageId = icon.getAttribute('data-page');
+                document.querySelectorAll('.page-section').forEach(section => {
+                    section.classList.remove('active');
+                });
+                
+                if (pageId === 'profile') {
+                    document.querySelector('.profile-panel').classList.add('open');
+                } else {
+                    document.querySelector('.profile-panel').classList.remove('open');
+                    document.getElementById(pageId).classList.add('active');
+                }
+            });
+        });
+        
+        // 头像打开个人资料
+        document.getElementById('profile-btn').addEventListener('click', () => {
+            document.querySelector('.profile-panel').classList.add('open');
+            document.querySelectorAll('.nav-icon').forEach(i => i.classList.remove('active'));
+            document.querySelector('[data-page="profile"]').classList.add('active');
+        });
+        
+        // 关闭个人资料
+        document.getElementById('close-profile').addEventListener('click', () => {
+            document.querySelector('.profile-panel').classList.remove('open');
+            document.querySelector('[data-page="profile"]').classList.remove('active');
+            document.querySelector('[data-page="home"]').classList.add('active');
+            document.querySelectorAll('.nav-icon').forEach(i => {
+                if (i.getAttribute('data-page') === 'home') {
+                    i.classList.add('active');
+                } else {
+                    i.classList.remove('active');
+                }
+            });
+        });
+        
+        // 添加任务按钮点击事件
+        document.getElementById('add-task-btn').addEventListener('click', () => {
+            // 显示加载中弹窗
+            const loadingOverlay = document.getElementById('loading-overlay');
+            loadingOverlay.classList.remove('hidden');
+            
+            // 模拟加载过程，3秒后隐藏加载弹窗
+            setTimeout(() => {
+                loadingOverlay.classList.add('hidden');
+                // 这里可以添加任务成功后的逻辑
+            }, 3000);
+        });
+        
+        // 任务子导航切换逻辑
+        document.getElementById('add-task-tab').addEventListener('click', () => {
+            document.getElementById('add-task-tab').classList.add('active');
+            document.getElementById('history-tab').classList.remove('active');
+            document.getElementById('add-task-content').classList.remove('hidden');
+            document.getElementById('history-content').classList.add('hidden');
+        });
+        
+        // 显示右键菜单
+        function showContextMenu(event, element) {
+            event.preventDefault();
+            currentTarget = element;
+            
+            const rect = element.getBoundingClientRect();
+            contextMenu.style.top = `${event.clientY}px`;
+            contextMenu.style.left = `${event.clientX}px`;
+            contextMenu.classList.remove('hidden');
+            
+            // 确保菜单不超出屏幕边界
+            setTimeout(() => {
+                const menuRect = contextMenu.getBoundingClientRect();
+                if (menuRect.right > window.innerWidth) {
+                    contextMenu.style.left = `${window.innerWidth - menuRect.width - 5}px`;
+                }
+                if (menuRect.bottom > window.innerHeight) {
+                    contextMenu.style.top = `${window.innerHeight - menuRect.height - 5}px`;
+                }
+            }, 0);
+        }
+        
+        // 删除项目
+        function deleteItem() {
+            if (currentTarget) {
+                currentTarget.classList.add('animate-fade-out');
+                setTimeout(() => {
+                    currentTarget.remove();
+                }, 300);
+                contextMenu.classList.add('hidden');
+            }
+        }
+        
+        // 添加新项目
+        function addItem() {
+            if (currentTarget) {
+                const newItem = currentTarget.cloneNode(true);
+                const label = newItem.querySelector('.task-item-label');
+                if (label) {
+                    label.textContent = '新添加项目';
+                }
+                currentTarget.parentNode.insertBefore(newItem, currentTarget.nextSibling);
+                contextMenu.classList.add('hidden');
+            }
+        }
+        
+        // AI拆解
+        function aiAnalyze() {
+            if (currentTarget) {
+                const loadingOverlay = document.getElementById('loading-overlay');
+                loadingOverlay.classList.remove('hidden');
+                
+                // 模拟AI处理时间
+                setTimeout(() => {
+                    loadingOverlay.classList.add('hidden');
+                    
+                    // 添加AI拆解的子任务
+                    const parentNode = currentTarget.parentNode;
+                    const subTaskContainer = document.createElement('div');
+                    subTaskContainer.className = 'pl-6 mb-2 animate-fade-in';
+                    subTaskContainer.innerHTML = `
+                        <div class="flex items-center mb-1" oncontextmenu="showContextMenu(event, this)" ondblclick="makeItemDraggable(this)">
+                            <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                            <span class="font-medium text-sm task-item-label" draggable="false">AI拆解任务1</span>
+                            <span class="ml-auto text-xs pill-badge">未开始</span>
+                        </div>
+                        <div class="flex items-center mb-1" oncontextmenu="showContextMenu(event, this)" ondblclick="makeItemDraggable(this)">
+                            <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                            <span class="font-medium text-sm task-item-label" draggable="false">AI拆解任务2</span>
+                            <span class="ml-auto text-xs pill-badge">未开始</span>
+                        </div>
+                    `;
+                    
+                    // 插入到当前项目之后
+                    if (parentNode.nextSibling) {
+                        parentNode.parentNode.insertBefore(subTaskContainer, parentNode.nextSibling);
+                    } else {
+                        parentNode.parentNode.appendChild(subTaskContainer);
+                    }
+                    
+                    contextMenu.classList.add('hidden');
+                }, 2000);
+            }
+        }
+        
+        // 使项目可拖动
+        function makeItemDraggable(element) {
+            if (isDragging) {
+                return;
+            }
+            
+            isDragging = true;
+            draggedItem = element;
+            initialY = event.clientY;
+            
+            // 创建一个占位符
+            placeholder = document.createElement('div');
+            placeholder.className = 'bg-purple-600/20 rounded h-10 mb-2 border border-dashed border-purple-400';
+            draggedItem.parentNode.insertBefore(placeholder, draggedItem);
+            
+            // 暂时隐藏原始元素
+            const originalDisplay = draggedItem.style.display;
+            draggedItem.style.position = 'fixed';
+            draggedItem.style.zIndex = 1000;
+            draggedItem.style.width = `${draggedItem.offsetWidth}px`;
+            draggedItem.style.top = `${event.clientY - draggedItem.offsetHeight / 2}px`;
+            draggedItem.style.left = `${event.clientX - draggedItem.offsetWidth / 2}px`;
+            draggedItem.style.opacity = '0.8';
+            draggedItem.style.pointerEvents = 'none';
+            
+            // 移动事件
+            function handleDragMove(e) {
+                draggedItem.style.top = `${e.clientY - draggedItem.offsetHeight / 2}px`;
+                draggedItem.style.left = `${e.clientX - draggedItem.offsetWidth / 2}px`;
+                
+                // 查找最近的可放置位置
+                const allItems = Array.from(draggedItem.parentNode.parentNode.querySelectorAll('.flex.items-center.mb-2'));
+                let closestItem = null;
+                let closestDistance = Infinity;
+                
+                allItems.forEach(item => {
+                    if (item !== draggedItem && item !== placeholder) {
+                        const rect = item.getBoundingClientRect();
+                        const distance = Math.abs(rect.top + rect.height / 2 - e.clientY);
+                        
+                        if (distance < closestDistance) {
+                            closestDistance = distance;
+                            closestItem = item;
+                        }
+                    }
+                });
+                
+                // 移动占位符
+                if (closestItem) {
+                    const rect = closestItem.getBoundingClientRect();
+                    if (e.clientY < rect.top + rect.height / 2) {
+                        closestItem.parentNode.insertBefore(placeholder, closestItem);
+                    } else {
+                        if (closestItem.nextSibling) {
+                            closestItem.parentNode.insertBefore(placeholder, closestItem.nextSibling);
+                        } else {
+                            closestItem.parentNode.appendChild(placeholder);
+                        }
+                    }
+                }
+            }
+            
+            // 结束拖动
+            function handleDragEnd() {
+                document.removeEventListener('mousemove', handleDragMove);
+                document.removeEventListener('mouseup', handleDragEnd);
+                
+                // 将元素放到占位符位置
+                placeholder.parentNode.insertBefore(draggedItem, placeholder);
+                placeholder.remove();
+                
+                // 恢复元素样式
+                draggedItem.style.position = '';
+                draggedItem.style.zIndex = '';
+                draggedItem.style.width = '';
+                draggedItem.style.top = '';
+                draggedItem.style.left = '';
+                draggedItem.style.opacity = '';
+                draggedItem.style.pointerEvents = '';
+                
+                isDragging = false;
+                draggedItem = null;
+                placeholder = null;
+            }
+            
+            document.addEventListener('mousemove', handleDragMove);
+            document.addEventListener('mouseup', handleDragEnd);
+        }
+        
+        document.getElementById('history-tab').addEventListener('click', () => {
+            document.getElementById('history-tab').classList.add('active');
+            document.getElementById('add-task-tab').classList.remove('active');
+            document.getElementById('add-task-content').classList.add('hidden');
+            document.getElementById('history-content').classList.remove('hidden');
+            
+            // 模拟加载历史数据
+            const loadingOverlay = document.getElementById('loading-overlay');
+            loadingOverlay.classList.remove('hidden');
+            
+            setTimeout(() => {
+                loadingOverlay.classList.add('hidden');
+                // 历史数据加载完成后的操作
+            }, 1500);
+        });
+    </script>
+
+</body></html>

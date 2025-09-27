@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-gradient: linear-gradient(140deg, #2A233B 0%, #1C1B2E 100%);
+  --card-bg: rgba(49, 43, 70, 0.6);
+  --highlight-gradient: linear-gradient(90deg, #E38EFF 0%, #7E57C2 100%);
+}
+
+body {
+  background: var(--bg-gradient);
+  color: #EAE9F1;
+  margin: 0;
+  height: 100vh;
+  font-family: 'Inter', system-ui, sans-serif;
+}
