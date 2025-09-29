@@ -15,6 +15,12 @@ class TaskStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     DONE = "done"
 
+# 定义任务优先级
+class TaskPriority(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
 
 class Task(Base):
     __tablename__ = "tasks" # 数据库的表名
@@ -24,6 +30,7 @@ class Task(Base):
     description: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     status: Mapped[TaskStatus] = mapped_column(SAEnum(TaskStatus), nullable=False, default=TaskStatus.NOT_STARTED)
+    priority: Mapped[TaskPriority] = mapped_column(SAEnum(TaskPriority), nullable=False, default=TaskPriority.MEDIUM)
     progress_percent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # 任务层级：顶层为 1，子任务为 2，依次类推
     level: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -39,6 +46,6 @@ class Task(Base):
     children: Mapped[list["Task"]] = relationship("Task", back_populates="parent", cascade="all, delete-orphan")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
-__all__ = ["Task", "TaskStatus"]
+__all__ = ["Task", "TaskStatus", "TaskPriority"]
 
 

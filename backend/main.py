@@ -5,6 +5,7 @@ from .welcomePage.greeting import router as greeting_router
 from .welcomePage.progress import router as progress_router
 from .welcomePage.tasks import router as tasks_router
 from .welcomePage.my_calendar import router as calendar_router
+from .task.routes import router as task_router
 
 
 def create_app() -> FastAPI:
@@ -24,6 +25,7 @@ def create_app() -> FastAPI:
     app.include_router(progress_router)
     app.include_router(tasks_router)
     app.include_router(calendar_router)
+    app.include_router(task_router)
 
     @app.get("/health")
     def health_check() -> dict:

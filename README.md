@@ -118,7 +118,7 @@ npm run dev
 
 ### 欢迎语接口
 - `GET /greeting` - 获取随机欢迎语
-  - 返回：`{"greeting": "来自鼠鼠的问候：xxx"}`
+  - 返回：`{"greeting": "来自/*6的问候：xxx"}`
 
 ### 进度统计接口
 - `GET /progress` - 获取任务状态分布统计

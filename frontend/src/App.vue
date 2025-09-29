@@ -3,10 +3,18 @@
     <!-- 左侧导航栏 -->
     <nav class="nav-bar">
       <div class="nav-icons">
-        <div class="nav-icon active" data-page="home">
+        <div 
+          class="nav-icon" 
+          :class="{ active: currentPage === 'home' }"
+          @click="changePage('home')"
+        >
           <span class="icon">🏠</span>
         </div>
-        <div class="nav-icon" data-page="task">
+        <div 
+          class="nav-icon" 
+          :class="{ active: currentPage === 'task' }"
+          @click="changePage('task')"
+        >
           <span class="icon">📋</span>
         </div>
       </div>
@@ -18,7 +26,8 @@
 
     <!-- 右侧主内容区 -->
     <main class="main-content">
-      <HomePage />
+      <HomePage v-if="currentPage === 'home'" />
+      <TaskPage v-if="currentPage === 'task'" />
     </main>
 
     <!-- 个人资料页（左侧滑出面板）- 完全隐藏，直到需要显示 -->
@@ -81,20 +90,26 @@
 
 <script>
 import HomePage from './views/HomePage.vue'
+import TaskPage from './views/TaskPage.vue'
 
 export default {
   name: 'App',
   components: {
-    HomePage
+    HomePage,
+    TaskPage
   },
   data() {
     return {
-      isProfileOpen: false
+      isProfileOpen: false,
+      currentPage: 'home'
     }
   },
   methods: {
     toggleProfile() {
       this.isProfileOpen = !this.isProfileOpen;
+    },
+    changePage(page) {
+      this.currentPage = page;
     }
   }
 }

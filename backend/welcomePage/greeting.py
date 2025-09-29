@@ -24,7 +24,7 @@ def get_random_greeting() -> Dict[str, Any]:
         # 如果数据不是列表或者为空，返回500
     text = random.choice(greetings)
     print(text)
-    return {"greeting": f"来自鼠鼠的问候：{text}"}
+    return {"greeting": f"{text}"}
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from backend.database import engine, DATA_DIR
-from backend.models import Base, Task, TaskStatus
+from backend.models import Base, Task, TaskStatus, TaskPriority
 
 
 
@@ -28,6 +28,7 @@ def add_task(
     description: str | None = None,
     deadline: date | None = None,
     status: TaskStatus = TaskStatus.NOT_STARTED,
+    priority: TaskPriority = TaskPriority.MEDIUM,
     progress: int = 0,
     parent_id: int | None = None,
 ) -> Task:
@@ -45,6 +46,7 @@ def add_task(
         description=description,
         deadline=deadline,
         status=status,
+        priority=priority,
         progress_percent=progress,
         parent_id=parent_id,
         level=(parent_level + 1) if parent_level else 1,

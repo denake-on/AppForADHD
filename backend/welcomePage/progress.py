@@ -17,9 +17,6 @@ def get_progress_summary() -> Dict[str, Dict[str, int]]:
     db_path = Path(__file__).resolve().parents[1] / "data" / "database.db"
     
     result = {}
-    # 初始化result
-    for level in range(1, 4):
-        result[f"level_{level}"] = {"NOT_STARTED": 0, "IN_PROGRESS": 0, "DONE": 0}
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
@@ -30,13 +27,26 @@ def get_progress_summary() -> Dict[str, Dict[str, int]]:
             ORDER BY level, status
             """
         ).fetchall()
+        
+        # 首先找出所有的层级，为每个层级初始化状态计数
+        levels = set()
+        for row in rows:
+            levels.add(row["level"])
+        
+        # 初始化所有存在的层级
+        for level in levels:
+            result[f"level_{level}"] = {"NOT_STARTED": 0, "IN_PROGRESS": 0, "DONE": 0}
+        
+        # 然后填充计数
         for row in rows:
             level = row["level"]
-            status = row["status"]
+            status = row["status"].upper()  # 转换为大写以匹配预定义状态
             count = row["count"]
             
             level_key = f"level_{level}"
-            result[level_key][status] = count
+            # 确保状态是预定义的值之一
+            if status in ["NOT_STARTED", "IN_PROGRESS", "DONE"]:
+                result[level_key][status] = count
     print(result)
     return result
 

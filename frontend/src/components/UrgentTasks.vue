@@ -4,13 +4,13 @@
       <h2 class="text-xl font-bold">今日紧急任务</h2>
     </div>
     <div class="overflow-auto" style="height: calc(100% - 63px);">
-      <div v-if="urgentTasks.length === 0" class="p-4 text-center text-gray-400">
+      <div v-if="urgentTasks.length === 0" class="p-6 text-center text-gray-400">
         暂无紧急任务
       </div>
       <div 
         v-for="task in urgentTasks" 
         :key="task.id" 
-        class="task-item"
+        class="task-item p-4 mb-3 border border-gray-700 rounded-lg bg-gray-800/30"
       >
         <div class="flex justify-between">
           <span class="font-medium">{{ task.title }}</span>
@@ -18,7 +18,7 @@
             <div 
               class="status-dot mr-2"
               :class="{
-                'status-gray': task.status === 'NOT_STARTED',
+                'status-gray': task.status === 'NO/*6T_STARTED',
                 'status-blue': task.status === 'IN_PROGRESS',
                 'status-gradient': task.status === 'DONE'
               }"
