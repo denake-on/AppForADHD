@@ -150,6 +150,16 @@ npm run dev
 - **AI分解**：使用OpenRouter API智能分解复杂任务
 - **批量操作**：支持批量状态更新和删除
 
+#### AI任务分解使用方法
+
+配置好OpenRouter API Key后，可以使用AI智能分解功能：
+
+1. **创建主任务**：先创建一个需要分解的复杂任务
+2. **点击分解按钮**：在任务列表中找到对应任务，点击"AI分解"按钮
+3. **输入分解要求**：在弹窗中描述如何分解任务（如：分解为3-5个子任务）
+4. **查看AI建议**：系统会调用AI生成子任务建议，包含标题、描述、截止日期和优先级
+5. **确认保存**：检查AI生成的子任务，确认后保存到系统中
+
 ### 🎨 UI/UX特性
 - **响应式设计**：适配桌面端和移动端
 - **毛玻璃效果**：现代化的半透明背景
@@ -190,12 +200,42 @@ npm run dev
 
 ## 配置说明
 
+### OpenRouter API Key 申请教程
+
+WeiWan 使用 OpenRouter API 来提供 AI 任务分解功能。要使用此功能，需要申请 OpenRouter API Key：
+
+#### 1. 注册 OpenRouter 账号
+
+1. 访问 [OpenRouter 官网](https://openrouter.ai/)
+2. 点击右上角 "Sign Up" 注册账号
+3. 可以使用 GitHub、Google 账号快速注册
+
+#### 2. 获取 API Key
+
+1. 登录后点击右上角用户头像，选择 "API Keys"
+2. 点击 "Create Key" 创建新的 API 密钥
+3. 输入密钥名称（如：WeiWan-TaskBreakdown）
+4. 复制生成的 API Key
+5. ⚠️ **重要**：请立即保存此密钥，页面刷新后将无法再次查看
+
+#### 3. 配置环境变量
+
+在项目根目录创建 `.env` 文件：
+
+```bash
+# 项目根目录下创建 .env 文件
+OPENROUTER_API_KEY=你的实际密钥
+```
+
 ### 后端配置
+
 - 数据库文件位置：`backend/data/database.db`
 - 欢迎语数据文件：`backend/data/greetings.json`
 - 默认端口：8000
+- OpenRouter API Key：通过环境变量 `OPENROUTER_API_KEY` 配置
 
 ### 前端配置
+
 - 开发服务器端口：3000
 - API代理配置：`frontend/vite.config.js`
 - 后端API地址：`http://localhost:8000`
