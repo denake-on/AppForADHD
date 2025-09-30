@@ -35,6 +35,7 @@
       <div 
         v-for="day in daysInMonth" 
         :key="day"
+        :data-day="day"
         class="calendar-day relative"
         :class="{
           'today': isToday(day),
@@ -184,6 +185,11 @@ export default {
       } else {
         this.selectedDate = dateStr
         this.selectedDateTasks = this.currentMonthData[dateStr] || []
+        
+        // 计算弹出框位置
+        this.$nextTick(() => {
+          this.positionPopup(day)
+        })
       }
     },
     formatDateForDisplay(day) {
@@ -236,6 +242,41 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+    positionPopup(day) {
+      // 定位弹出框到合适的位置
+      this.$nextTick(() => {
+        const popup = this.$el.querySelector('.selected-popup')
+        if (popup) {
+          const dayElement = this.$el.querySelector(`[data-day="${day}"]`)
+          if (dayElement) {
+            const rect = dayElement.getBoundingClientRect()
+            const popupRect = popup.getBoundingClientRect()
+            
+            // 计算最佳位置 - 让弹出框从当前日期格子的下方显示
+            let top = rect.bottom + 8
+            let left = rect.left + (rect.width / 2) - (popupRect.width / 2)
+            
+            // 确保弹出框不超出视窗右边界
+            if (left + popupRect.width > window.innerWidth - 16) {
+              left = window.innerWidth - popupRect.width - 16
+            }
+            // 确保弹出框不超出视窗左边界
+            if (left < 16) {
+              left = 16
+            }
+            
+            // 如果下方空间不够，显示在上方
+            if (top + popupRect.height > window.innerHeight - 16) {
+              top = rect.top - popupRect.height - 8
+            }
+            
+            popup.style.top = `${top}px`
+            popup.style.left = `${left}px`
+            popup.style.position = 'fixed'
+          }
+        }
+      })
     }
   }
 }
@@ -436,8 +477,8 @@ export default {
 
 /* 工具提示样式 */
 .tooltip {
-  position: absolute;
-  bottom: 100%;
+  position: fixed;
+  bottom: auto;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(42, 35, 59, 0.95);
@@ -446,7 +487,7 @@ export default {
   padding: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(10px);
-  z-index: 9999;
+  z-index: 99999;
   min-width: 200px;
   max-width: 250px;
   margin-bottom: 8px;
@@ -498,19 +539,16 @@ export default {
 
 /* 选中日期弹出框样式 */
 .selected-popup {
-  position: absolute;
-  top: 100%;
-  left: 0;
+  position: fixed;
   background: rgba(42, 35, 59, 0.95);
   border: 1px solid rgba(227, 142, 255, 0.4);
   border-radius: 12px;
   padding: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(10px);
-  z-index: 9999;
+  z-index: 99999;
   min-width: 200px;
   max-width: 250px;
-  margin-top: 8px;
 }
 
 .popup-header {
