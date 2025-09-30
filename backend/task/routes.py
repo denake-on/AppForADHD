@@ -3,9 +3,18 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 
-from ..database import get_db
-from ..models import Task, TaskStatus, TaskPriority
+# 修复打包环境下的导入问题
+try:
+    # 开发环境下（相对导入）
+    from ..database import get_db
+    from ..models import Task, TaskStatus, TaskPriority
+except ImportError:
+    # 打包环境下（绝对导入）
+    from backend.database import get_db
+    from backend.models import Task, TaskStatus, TaskPriority
+
 from . import crud
+from .BreakDownTask import breakdown_service
 
 
 # 定义层级任务的数据模型
@@ -410,3 +419,152 @@ def update_task_status_with_descendants(
         "level": task.level,
         "parent_id": task.parent_id
     }
+
+
+@router.post("/{task_id}/breakdown", response_model=dict)
+def breakdown_task(
+    task_id: int,
+    prompt: str = Query(..., min_length=1),
+    db: Session = Depends(get_db)
+):
+    """
+    AI拆解任务 - 使用OpenRouter API进行智能任务拆解
+    """
+    # 获取任务信息
+    task = crud.get_task(db, task_id=task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # 构建任务信息字典
+    task_info = {
+        "id": task.id,
+        "title": task.title,
+        "description": task.description or "无描述",
+        "level": task.level,
+        "status": task.status.value,
+        "priority": task.priority.value,
+        "deadline": task.deadline.isoformat() if task.deadline else "无截止日期"
+    }
+    
+    # 打印原始请求信息
+    print("\n" + "="*80)
+    print("AI拆解任务请求")
+    print("="*80)
+    print(f"任务ID: {task.id}")
+    print(f"任务标题: {task.title}")
+    print(f"任务描述: {task.description}")
+    print(f"任务层级: Level {task.level}")
+    print(f"任务状态: {task.status.value}")
+    print(f"任务优先级: {task.priority.value}")
+    print(f"截止日期: {task.deadline.isoformat() if task.deadline else '无'}")
+    print("-"*80)
+    print(f"拆解提示词:\n{prompt}")
+    print("="*80 + "\n")
+    
+    # 调用AI拆解服务
+    try:
+        breakdown_tasks = breakdown_service.breakdown_task(task_info, prompt)
+        
+        if breakdown_tasks and len(breakdown_tasks) > 0:
+            return {
+                "success": True,
+                "message": "AI拆解成功",
+                "task_id": task.id,
+                "task_title": task.title,
+                "prompt": prompt,
+                "breakdown_tasks": breakdown_tasks,
+                "subtask_count": len(breakdown_tasks)
+            }
+        else:
+            return {
+                "success": False,
+                "message": "AI拆解失败，请稍后重试",
+                "task_id": task.id,
+                "task_title": task.title,
+                "prompt": prompt,
+                "breakdown_tasks": [],
+                "subtask_count": 0
+            }
+        
+    except Exception as e:
+        print(f"❌ 拆解过程中发生错误: {str(e)}")
+        return {
+            "success": False,
+            "message": "AI拆解失败，请稍后重试",
+            "task_id": task.id,
+            "task_title": task.title,
+            "prompt": prompt,
+            "error": str(e),
+            "breakdown_tasks": [],
+            "subtask_count": 0
+        }
+
+
+@router.post("/{task_id}/breakdown/confirm", response_model=dict)
+def confirm_breakdown_tasks(
+    task_id: int,
+    subtasks: List[dict],
+    db: Session = Depends(get_db)
+):
+    """
+    确认并保存AI拆解的子任务
+    """
+    # 获取父任务信息
+    parent_task = crud.get_task(db, task_id=task_id)
+    if parent_task is None:
+        raise HTTPException(status_code=404, detail="Parent task not found")
+    
+    try:
+        created_tasks = []
+        
+        for subtask_data in subtasks:
+            # 解析截止日期
+            deadline_date = None
+            if subtask_data.get('deadline'):
+                try:
+                    from datetime import datetime
+                    deadline_date = datetime.strptime(subtask_data['deadline'], "%Y-%m-%d").date()
+                except ValueError:
+                    print(f"⚠️ 无效的截止日期格式: {subtask_data['deadline']}")
+            
+            # 映射优先级
+            priority_map = {
+                'high': TaskPriority.HIGH,
+                'medium': TaskPriority.MEDIUM,
+                'low': TaskPriority.LOW
+            }
+            priority = priority_map.get(subtask_data.get('priority', 'medium'), TaskPriority.MEDIUM)
+            
+            # 创建子任务
+            db_subtask = crud.create_task(
+                db,
+                title=subtask_data['title'],
+                description=subtask_data.get('description', ''),
+                deadline=deadline_date,
+                priority=priority,
+                parent_id=task_id,
+                level=parent_task.level + 1
+            )
+            
+            created_tasks.append({
+                "id": db_subtask.id,
+                "title": db_subtask.title,
+                "description": db_subtask.description,
+                "deadline": db_subtask.deadline.isoformat() if db_subtask.deadline else None,
+                "priority": db_subtask.priority.value,
+                "level": db_subtask.level,
+                "parent_id": db_subtask.parent_id
+            })
+        
+        print(f"✅ 成功创建 {len(created_tasks)} 个子任务")
+        
+        return {
+            "success": True,
+            "message": f"成功创建 {len(created_tasks)} 个子任务",
+            "parent_task_id": task_id,
+            "created_tasks": created_tasks
+        }
+        
+    except Exception as e:
+        print(f"❌ 创建子任务时发生错误: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"创建子任务失败: {str(e)}")

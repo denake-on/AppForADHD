@@ -11,10 +11,17 @@ router = APIRouter(tags=["calendar"]) # 创建API路由组
 
 
 @router.get("/calendar")
-def get_calendar() -> Dict[str, List[Dict[str, Any]]]:
-    # Return tasks grouped by deadline day for current month
-    today = date.today()
-    month_start = today.replace(day=1) # 获取当前月份的第一天
+def get_calendar(year: int = None, month: int = None) -> Dict[str, List[Dict[str, Any]]]:
+    # Return tasks grouped by deadline day for specified month or current month
+    if year is None or month is None:
+        # 如果没有指定年月，使用当前月份
+        today = date.today()
+        target_date = today.replace(day=1)
+    else:
+        # 使用指定的年月
+        target_date = date(year, month, 1)
+    
+    month_start = target_date # 获取目标月份的第一天
     ##########################
     # 获取下个月的第一天
     ##########################

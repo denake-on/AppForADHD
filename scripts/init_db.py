@@ -70,8 +70,8 @@ def seed_example() -> None:
             title="发布 v1.0",
             description="版本发布大任务",
             deadline=date.today() + timedelta(days=14),
-            status=TaskStatus.IN_PROGRESS,
-            progress=20,
+            status=TaskStatus.NOT_STARTED,
+            progress=0,
         )
 
         # 子任务（deadline 参照父任务，可按比例/缓冲期自行计算）
@@ -80,16 +80,16 @@ def seed_example() -> None:
             title="设计评审",
             deadline=project.deadline and project.deadline - timedelta(days=10),
             parent_id=project.id,
-            status=TaskStatus.DONE,
-            progress=100,
+            status=TaskStatus.NOT_STARTED,
+            progress=0,
         )
         dev = add_task(
             session,
             title="功能开发",
             deadline=project.deadline and project.deadline - timedelta(days=4),
             parent_id=project.id,
-            status=TaskStatus.IN_PROGRESS,
-            progress=50,
+            status=TaskStatus.NOT_STARTED,
+            progress=0,
         )
         test = add_task(
             session,
@@ -106,8 +106,8 @@ def seed_example() -> None:
             title="单元测试",
             deadline=dev.deadline and dev.deadline - timedelta(days=2),
             parent_id=dev.id,
-            status=TaskStatus.IN_PROGRESS,
-            progress=30,
+            status=TaskStatus.NOT_STARTED,
+            progress=0,
         )
         add_task(
             session,
@@ -125,16 +125,16 @@ def seed_example() -> None:
             title="网站改版",
             description="首页与详情页重构",
             deadline=date.today() + timedelta(days=21),
-            status=TaskStatus.IN_PROGRESS,
-            progress=40,
+            status=TaskStatus.NOT_STARTED,
+            progress=0,
         )
         ui = add_task(
             session,
             title="UI 设计",
             deadline=revamp.deadline and revamp.deadline - timedelta(days=14),
             parent_id=revamp.id,
-            status=TaskStatus.IN_PROGRESS,
-            progress=60,
+            status=TaskStatus.NOT_STARTED,
+            progress=0,
         )
         fe = add_task(
             session,
@@ -177,24 +177,24 @@ def seed_example() -> None:
             title="数据迁移",
             description="从老库迁移到新库",
             deadline=date.today() + timedelta(days=10),
-            status=TaskStatus.IN_PROGRESS,
-            progress=35,
+            status=TaskStatus.NOT_STARTED,
+            progress=0,
         )
         assess = add_task(
             session,
             title="评估与映射",
             deadline=migrate.deadline and migrate.deadline - timedelta(days=8),
             parent_id=migrate.id,
-            status=TaskStatus.DONE,
-            progress=100,
+            status=TaskStatus.NOT_STARTED,
+            progress=0,
         )
         tooling = add_task(
             session,
             title="迁移脚本编写",
             deadline=migrate.deadline and migrate.deadline - timedelta(days=4),
             parent_id=migrate.id,
-            status=TaskStatus.IN_PROGRESS,
-            progress=40,
+            status=TaskStatus.NOT_STARTED,
+            progress=0,
         )
         verify = add_task(
             session,

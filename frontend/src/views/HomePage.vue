@@ -128,6 +128,7 @@ export default {
 /* 确保卡片组件填充整个象限 */
 .quadrant > div {
   height: 100%;
+  min-height: 0;  /* 允许flex子项收缩 */
   display: flex;
   flex-direction: column;
 }
@@ -137,10 +138,41 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow: hidden;
 }
 
 .quadrant-4 .calendar-grid {
   flex: 1;
   min-height: 0; /* 允许内容收缩 */
+  overflow-y: auto;
+}
+
+/* 小屏幕适配 */
+@media (max-width: 768px) {
+  .home-grid {
+    gap: 16px;
+    height: calc(100vh - 48px);
+  }
+  
+  .quadrant {
+    min-height: 250px;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+    gap: 12px;
+  }
+  
+  .quadrant-1, .quadrant-2, .quadrant-3, .quadrant-4 {
+    grid-column: 1;
+  }
+  
+  .quadrant-1 { grid-row: 1; }
+  .quadrant-2 { grid-row: 2; }
+  .quadrant-3 { grid-row: 3; }
+  .quadrant-4 { grid-row: 4; }
 }
 </style>

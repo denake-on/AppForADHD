@@ -60,6 +60,11 @@ export const getCalendar = () => {
   return apiClient.get('/calendar')  // 实际后端路由是 /calendar
 }
 
+// 获取指定月份的日历数据
+export const getCalendarByMonth = (year, month) => {
+  return apiClient.get(`/calendar?year=${year}&month=${month}`)  // 支持年月参数的日历数据
+}
+
 // 将进度和完成度合并为一个函数（因为它们可能都需要）
 export const getProgress = async () => {
   try {

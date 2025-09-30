@@ -16,7 +16,7 @@
     <div class="filter-options">
       <select class="filter-select" v-model="statusFilter" @change="onFilterChange">
         <option value="">全部状态</option>
-        <option value="todo">待办</option>
+        <option value="todo">未开始</option>
         <option value="in-progress">进行中</option>
         <option value="done">已完成</option>
       </select>
@@ -26,6 +26,17 @@
         <option value="low">低优先级</option>
         <option value="medium">中优先级</option>
         <option value="high">高优先级</option>
+      </select>
+      
+      <select class="filter-select" v-model="sortBy" @change="onFilterChange">
+        <option value="">默认排序</option>
+        <option value="priority">按优先级排序</option>
+        <option value="date">按截止日期排序</option>
+      </select>
+      
+      <select class="filter-select" v-model="sortOrder" @change="onFilterChange" v-if="sortBy">
+        <option value="asc">升序</option>
+        <option value="desc">降序</option>
       </select>
     </div>
   </div>
@@ -46,13 +57,23 @@ export default {
     initialPriorityFilter: {
       type: String,
       default: ''
+    },
+    initialSortBy: {
+      type: String,
+      default: ''
+    },
+    initialSortOrder: {
+      type: String,
+      default: 'asc'
     }
   },
   data() {
     return {
       searchQuery: this.initialSearchQuery,
       statusFilter: this.initialStatusFilter,
-      priorityFilter: this.initialPriorityFilter
+      priorityFilter: this.initialPriorityFilter,
+      sortBy: this.initialSortBy,
+      sortOrder: this.initialSortOrder
     }
   },
   methods: {
@@ -60,14 +81,18 @@ export default {
       this.$emit('filter-change', {
         searchQuery: this.searchQuery,
         statusFilter: this.statusFilter,
-        priorityFilter: this.priorityFilter
+        priorityFilter: this.priorityFilter,
+        sortBy: this.sortBy,
+        sortOrder: this.sortOrder
       });
     },
     onFilterChange() {
       this.$emit('filter-change', {
         searchQuery: this.searchQuery,
         statusFilter: this.statusFilter,
-        priorityFilter: this.priorityFilter
+        priorityFilter: this.priorityFilter,
+        sortBy: this.sortBy,
+        sortOrder: this.sortOrder
       });
     }
   }

@@ -23,6 +23,7 @@ def get_progress_summary() -> Dict[str, Dict[str, int]]:
             """
             SELECT level, status, COUNT(*) as count
             FROM tasks
+            WHERE level=1
             GROUP BY level, status
             ORDER BY level, status
             """

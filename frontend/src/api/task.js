@@ -57,3 +57,17 @@ export const updateTaskStatusWithDescendants = async (taskId, status) => {
   });
   return response.data;
 };
+
+// 拆解任务
+export const breakdownTask = async (taskId, prompt) => {
+  const response = await axios.post(`${API_BASE_URL}/tasks/${taskId}/breakdown`, null, {
+    params: { prompt }
+  });
+  return response.data;
+};
+
+// 确认拆解的子任务
+export const confirmBreakdownTasks = async (taskId, subtasks) => {
+  const response = await axios.post(`${API_BASE_URL}/tasks/${taskId}/breakdown/confirm`, subtasks);
+  return response.data;
+};

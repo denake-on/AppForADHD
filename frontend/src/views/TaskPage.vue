@@ -15,11 +15,13 @@
       :initial-search-query="searchQuery"
       :initial-status-filter="statusFilter"
       :initial-priority-filter="priorityFilter"
+      :initial-sort-by="sortBy"
+      :initial-sort-order="sortOrder"
       @filter-change="onFilterChange"
     />
 
     <!-- 任务统计卡片 -->
-    <TaskStats :tasks="tasks" />
+    <TaskStats :tasks="levelOneTasks" />
 
     <!-- 任务列表 -->
     <div class="tasks-container">
@@ -28,7 +30,12 @@
       </div>
       
       <TabbedTaskList 
-        :tasks="filteredTasks"
+        :tasks="tasks"
+        :status-filter="statusFilter"
+        :priority-filter="priorityFilter"
+        :search-query="searchQuery"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
         @toggle-status="toggleTaskStatus"
         @edit-task="editTask"
         @delete-task="deleteTask"
@@ -43,6 +50,15 @@
       @close="closeTaskModal"
       @save="saveTask"
     />
+    
+    <!-- 确认删除对话框 -->
+    <DeleteConfirmModal
+      :show="showDeleteModal"
+      :task-title="deleteTaskTitle"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+      @close="cancelDelete"
+    />
   </div>
 </template>
 
@@ -53,6 +69,7 @@ import TabbedTaskList from '@/components_taskPage/DualTaskList.vue';
 import TaskFilters from '@/components_taskPage/TaskFilters.vue';
 import TaskStats from '@/components_taskPage/TaskStats.vue';
 import TaskModal from '@/components_taskPage/TaskModal.vue';
+import DeleteConfirmModal from '@/components_taskPage/DeleteConfirmModal.vue';
 
 export default {
   name: 'TaskPage',
@@ -61,7 +78,8 @@ export default {
     TabbedTaskList,
     TaskFilters,
     TaskStats,
-    TaskModal
+    TaskModal,
+    DeleteConfirmModal
   },
   data() {
     return {
@@ -71,8 +89,13 @@ export default {
       searchQuery: '',
       statusFilter: '',
       priorityFilter: '',
+      sortBy: '', // 排序字段 ('priority', 'date')
+      sortOrder: 'asc', // 排序方向 ('asc', 'desc')
       showTaskModal: false,
-      editingTask: null
+      editingTask: null,
+      showDeleteModal: false,
+      deleteTaskId: null,
+      deleteTaskTitle: ''
     }
   },
   computed: {
@@ -87,6 +110,19 @@ export default {
     },
     totalTasks() {
       return this.tasks.length;
+    },
+    // 只统计Level 1的任务，用于显示在统计卡片上
+    levelOneTasks() {
+      return this.tasks.filter(task => task.level === 1);
+    },
+    todoTasksLevelOne() {
+      return this.levelOneTasks.filter(task => task.status === 'todo').length;
+    },
+    inProgressTasksLevelOne() {
+      return this.levelOneTasks.filter(task => task.status === 'in-progress').length;
+    },
+    completedTasksLevelOne() {
+      return this.levelOneTasks.filter(task => task.status === 'done').length;
     }
   },
   mounted() {
@@ -97,6 +133,8 @@ export default {
       try {
         // 从后端API获取层级结构的任务列表
         const response = await getHierarchicalTasks();
+        // 保存层级结构数据
+        this.hierarchicalTasks = response;
         // 将后端返回的优先级和状态值映射到前端使用的值
         this.tasks = this.flattenTasks(response);
         this.filteredTasks = [...this.tasks];
@@ -136,29 +174,11 @@ export default {
       this.searchQuery = filters.searchQuery;
       this.statusFilter = filters.statusFilter;
       this.priorityFilter = filters.priorityFilter;
+      this.sortBy = filters.sortBy;
+      this.sortOrder = filters.sortOrder;
       
-      let result = this.tasks;
-      
-      // 根据搜索关键词过滤
-      if (this.searchQuery) {
-        const query = this.searchQuery.toLowerCase();
-        result = result.filter(task => 
-          task.title.toLowerCase().includes(query) || 
-          (task.description && task.description.toLowerCase().includes(query))
-        );
-      }
-      
-      // 根据状态过滤
-      if (this.statusFilter) {
-        result = result.filter(task => this.mapStatusForBackend(task.status) === this.statusFilter);
-      }
-      
-      // 根据优先级过滤
-      if (this.priorityFilter) {
-        result = result.filter(task => this.mapPriorityForBackend(task.priority) === this.priorityFilter);
-      }
-      
-      this.filteredTasks = result;
+      // DualTaskList组件会处理所有筛选和排序，所以filteredTasks不需要进一步过滤
+      this.filteredTasks = [...this.tasks];
     },
     openCreateTaskModal() {
       this.editingTask = null;
@@ -212,12 +232,8 @@ export default {
         }
         
         this.closeTaskModal();
-        // 重新应用过滤
-        this.onFilterChange({
-          searchQuery: this.searchQuery,
-          statusFilter: this.statusFilter,
-          priorityFilter: this.priorityFilter
-        });
+        // 重新加载任务数据，确保UI立即更新
+        await this.loadTasks();
       } catch (error) {
         console.error('保存任务失败:', error);
         alert('保存任务失败，请稍后重试');
@@ -253,23 +269,33 @@ export default {
         alert('更新任务状态失败，请稍后重试');
       }
     },
-    async deleteTask(taskId) {
-      if (confirm('确定要删除这个任务吗？')) {
-        try {
-          await deleteTask(taskId);
-          // 从本地任务列表中删除
-          this.tasks = this.tasks.filter(task => task.id !== taskId);
-          // 重新应用过滤
-          this.onFilterChange({
-            searchQuery: this.searchQuery,
-            statusFilter: this.statusFilter,
-            priorityFilter: this.priorityFilter
-          });
-        } catch (error) {
-          console.error('删除任务失败:', error);
-          alert('删除任务失败，请稍后重试');
-        }
+    deleteTask(taskId) {
+      // 找到要删除的任务，获取其标题
+      const task = this.tasks.find(t => t.id === taskId);
+      if (task) {
+        this.deleteTaskId = taskId;
+        this.deleteTaskTitle = task.title;
+        this.showDeleteModal = true;
       }
+    },
+    async confirmDelete() {
+      if (!this.deleteTaskId) return;
+      
+      try {
+        await deleteTask(this.deleteTaskId);
+        // 删除成功后重新加载所有任务数据，确保UI立即更新
+        await this.loadTasks();
+      } catch (error) {
+        console.error('删除任务失败:', error);
+        alert('删除任务失败，请稍后重试');
+      } finally {
+        this.cancelDelete();
+      }
+    },
+    cancelDelete() {
+      this.showDeleteModal = false;
+      this.deleteTaskId = null;
+      this.deleteTaskTitle = '';
     },
     
     // 递归更新所有后代任务的状态
@@ -324,6 +350,10 @@ export default {
       return priorityMap[backendPriority] || 'medium';
     },
     
+    setSort(sortBy, order) {
+      this.sortBy = sortBy;
+      this.sortOrder = order;
+    },
     
   }
 }

@@ -2,7 +2,14 @@ from datetime import date
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
-from ..models import Task, TaskStatus, TaskPriority
+
+# 修复打包环境下的导入问题
+try:
+    # 开发环境下（相对导入）
+    from ..models import Task, TaskStatus, TaskPriority
+except ImportError:
+    # 打包环境下（绝对导入）
+    from backend.models import Task, TaskStatus, TaskPriority
 
 
 def get_tasks(
@@ -131,16 +138,77 @@ def delete_task(db: Session, task_id: int) -> bool:
 
 def update_task_status(db: Session, task_id: int, status: TaskStatus) -> Optional[Task]:
     """
-    专门用于更新任务状态的方法
+    专门用于更新任务状态的方法，同时更新父任务状态
     """
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         return None
     
+    # 记录旧状态，用于判断是否需要更新父任务
+    old_status = db_task.status
     db_task.status = status
+    
+    # 更新父任务状态
+    update_parent_task_status(db, db_task.parent_id, db_task.level)
+    
     db.commit()
     db.refresh(db_task)
     return db_task
+
+
+def are_all_descendants_completed(db: Session, task_id: int) -> bool:
+    """
+    检查任务的所有后代（子任务、孙任务等）是否都已完成
+    """
+    # 获取所有后代任务
+    descendants = get_all_descendants(db, task_id)
+    
+    # 检查是否所有后代都已完成
+    for descendant in descendants:
+        if descendant.status != TaskStatus.DONE:
+            return False
+    
+    return True
+
+
+def update_parent_task_status(db: Session, parent_id: Optional[int], child_level: int):
+    """
+    更新父任务状态：
+    1. 如果子任务状态变为进行中或已完成，且父任务状态为未开始，则将父任务状态改为进行中
+    2. 如果是level 1的任务（顶级任务），不需要更新父任务
+    """
+    # 如果是顶级任务（level 1）或没有父任务，直接返回
+    if parent_id is None or child_level <= 1:
+        return
+    
+    parent_task = db.query(Task).filter(Task.id == parent_id).first()
+    if not parent_task:
+        return
+    
+    # 获取所有直接子任务
+    children = db.query(Task).filter(Task.parent_id == parent_id).all()
+    
+    # 如果父任务状态为未开始且有子任务变为进行中或完成，则将父任务改为进行中
+    if parent_task.status == TaskStatus.NOT_STARTED:
+        for child in children:
+            if child.status in [TaskStatus.IN_PROGRESS, TaskStatus.DONE]:
+                parent_task.status = TaskStatus.IN_PROGRESS
+                break
+    
+    # 检查是否所有子任务都已完成，如果是，则将父任务状态改为已完成
+    all_children_completed = True
+    for child in children:
+        if child.status != TaskStatus.DONE:
+            all_children_completed = False
+            break
+    
+    if all_children_completed and all(child.status == TaskStatus.DONE for child in children):
+        # 检查所有后代是否都已完成（包括子任务的子任务等）
+        if are_all_descendants_completed(db, parent_task.id):
+            parent_task.status = TaskStatus.DONE
+    
+    # 递归更新上层父任务
+    update_parent_task_status(db, parent_task.parent_id, parent_task.level)
 
 
 def update_task_status_with_children(db: Session, task_id: int, status: TaskStatus) -> Optional[Task]:
@@ -151,11 +219,16 @@ def update_task_status_with_children(db: Session, task_id: int, status: TaskStat
     if not db_task:
         return None
     
+    # 记录旧状态
+    old_status = db_task.status
     db_task.status = status
     
     # 如果是父任务完成，则完成所有子任务
     if status == TaskStatus.DONE:
         update_all_children_status(db, task_id, TaskStatus.DONE)
+    
+    # 更新父任务状态
+    update_parent_task_status(db, db_task.parent_id, db_task.level)
     
     db.commit()
     db.refresh(db_task)
