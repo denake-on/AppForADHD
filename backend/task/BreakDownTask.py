@@ -9,7 +9,7 @@ class TaskBreakdownService:
         # OpenRouter API配置
         self.api_key = os.getenv('OPENROUTER_API_KEY', 'your_openrouter_api_key')
         self.base_url = "https://openrouter.ai/api/v1/chat/completions"
-        self.model = "deepseek/deepseek-r1-0528"  # 使用DeepSeek R1模型
+        self.model = "qwen/qwen3-235b-a22b-2507"  # 使用Qwen 3模型
         
     def call_openrouter_api(self, prompt: str, task_info: Dict[str, Any]) -> str:
         """
