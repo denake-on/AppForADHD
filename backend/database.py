@@ -20,6 +20,7 @@ os.makedirs(data_dir, exist_ok=True)
 db_path = os.path.join(data_dir, 'database.db')
 
 DATABASE_URL = f"sqlite:///{db_path}"
+DATA_DIR = Path(data_dir)
 
 engine = create_engine(
     DATABASE_URL,
