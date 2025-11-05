@@ -3,18 +3,60 @@ import json
 import re
 from typing import List, Dict, Any
 import os
+from pathlib import Path
 
 class TaskBreakdownService:
     def __init__(self):
         # OpenRouter API配置
-        self.api_key = os.getenv('OPENROUTER_API_KEY', 'your_default_api_key_here')
+        # default
+        self.api_key = None
+        self.model = 'tngtech/deepseek-r1t-chimera:free'
+        
+        self.api_key = self._load_api_key()
         self.base_url = "https://openrouter.ai/api/v1/chat/completions"
-        self.model = "tngtech/deepseek-r1t-chimera:free"
+        self.model = self._load_model()
+        
+    def _load_model(self):
+        """加载模型名称"""
+        # 从配置文件读取
+        config_path = Path(__file__).parent.parent.parent / 'config.json'
+        if config_path.exists():
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    return config.get('model', self.model)
+            except Exception as e:
+                print(f"⚠️  读取配置文件失败: {e}")
+        return self.model
+
+        
+    def _load_api_key(self):
+        """加载 API Key"""
+        # 优先从环境变量读取
+        api_key = os.getenv('OPENROUTER_API_KEY')
+        if api_key:
+            return api_key
+        
+        # 从配置文件读取
+        config_path = Path(__file__).parent.parent.parent / 'config.json'
+        if config_path.exists():
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    return config.get('api_key')
+            except Exception as e:
+                print(f"⚠️  读取配置文件失败: {e}")
+        return None
+        
+     
         
     def call_openrouter_api(self, prompt: str, task_info: Dict[str, Any]) -> str:
         """
         调用OpenRouter API进行任务拆解
         """
+        if not self.api_key:
+            print("❌ API Key 未配置")
+            return None
         # 构建系统提示词
         system_prompt = """你是一个专业的项目管理助手，擅长将复杂任务拆解为可执行的子任务。
 
@@ -104,9 +146,13 @@ class TaskBreakdownService:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "http://localhost:8000",  # 可选：标识请求来源
-            "X-Title": "WeiWan Task Breakdown"  # 可选：应用名称
+            "HTTP-Referer": "https://github.com/denake-on/AppForADHD",  # 可选：标识请求来源
+            "X-Title": "AppForADHD"  # 可选：应用名称
         }
+
+        print(f"🔍 发送请求到 OpenRouter API")
+        print(f"🔍 模型: {self.model}")
+        print(f"🔍 API Key: {self.api_key[:10]}...{self.api_key[-4:]}")
 
         try:
             # 发送请求

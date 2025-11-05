@@ -1,90 +1,130 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Any
 from datetime import date
 import sqlite3
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter(tags=["progress"])
 
 
-# 统计每种状态的数量用于饼图的显示
-@router.get("/progress")
-def get_progress_summary() -> Dict[str, Dict[str, int]]:
-    # 直接从 SQLite 读取，按层级分组统计
-    db_path = Path(__file__).resolve().parents[1] / "data" / "database.db"
-    
-    result = {}
-    with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            """
-            SELECT level, status, COUNT(*) as count
-            FROM tasks
-            WHERE level=1
-            GROUP BY level, status
-            ORDER BY level, status
-            """
-        ).fetchall()
+@router.get("")
+def get_progress_summary() -> Dict[str, Any]:
+    """统计每种状态的数量用于饼图显示"""
+    try:
+        db_path = Path(__file__).resolve().parents[1] / "data" / "database.db"
         
-        # 首先找出所有的层级，为每个层级初始化状态计数
-        levels = set()
-        for row in rows:
-            levels.add(row["level"])
+        if not db_path.exists():
+            print(f"❌ 数据库文件不存在: {db_path}")
+            raise HTTPException(status_code=500, detail="Database not found")
         
-        # 初始化所有存在的层级
-        for level in levels:
-            result[f"level_{level}"] = {"NOT_STARTED": 0, "IN_PROGRESS": 0, "DONE": 0}
+        print(f"📊 查询进度统计，数据库路径: {db_path}")
         
-        # 然后填充计数
-        for row in rows:
-            level = row["level"]
-            status = row["status"].upper()  # 转换为大写以匹配预定义状态
-            count = row["count"]
+        result = {}
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT level, status, COUNT(*) as count
+                FROM tasks
+                WHERE level = 1
+                GROUP BY level, status
+                ORDER BY level, status
+                """
+            ).fetchall()
             
-            level_key = f"level_{level}"
-            # 确保状态是预定义的值之一
-            if status in ["NOT_STARTED", "IN_PROGRESS", "DONE"]:
-                result[level_key][status] = count
-    print(result)
-    return result
+            print(f"📋 查询到 {len(rows)} 条统计记录")
+            
+            # 首先找出所有的层级
+            levels = set()
+            for row in rows:
+                levels.add(row["level"])
+                print(f"  - Level {row['level']}, Status: {row['status']}, Count: {row['count']}")
+            
+            # 初始化所有存在的层级
+            for level in levels:
+                result[f"level_{level}"] = {
+                    "TODO": 0,
+                    "IN_PROGRESS": 0,
+                    "DONE": 0,
+                    "CANCELLED": 0
+                }
+            
+            # 填充计数
+            for row in rows:
+                level = row["level"]
+                status = row["status"]
+                count = row["count"]
+                
+                level_key = f"level_{level}"
+                if status in ["TODO", "IN_PROGRESS", "DONE", "CANCELLED"]:
+                    result[level_key][status] = count
+        
+        print(f"✅ 进度统计结果: {result}")
+        return result
+        
+    except sqlite3.Error as e:
+        print(f"❌ 数据库查询失败: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except Exception as e:
+        print(f"❌ 获取进度失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/completion")
 def get_today_completion() -> Dict[str, int]:
-    today = date.today().isoformat()
-    
-    db_path = Path(__file__).resolve().parents[1] / "data" / "database.db"
-    with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
+    """获取今日完成度"""
+    try:
+        today = date.today().isoformat()
+        print(f"📅 查询今日完成度: {today}")
         
-        # 统计今日截止的任务总数
-        total_row = conn.execute(
-            "SELECT COUNT(*) as count FROM tasks WHERE date(deadline) = date(?)",
-            (today,)
-        ).fetchone()
-        total = total_row["count"] if total_row else 0
+        db_path = Path(__file__).resolve().parents[1] / "data" / "database.db"
         
-        # 统计今日截止且已完成的任务数
-        done_row = conn.execute(
-            "SELECT COUNT(*) as count FROM tasks WHERE date(deadline) = date(?) AND status = 'done'",
-            (today,)
-        ).fetchone()
-        done = done_row["count"] if done_row else 0
+        if not db_path.exists():
+            print(f"❌ 数据库文件不存在: {db_path}")
+            raise HTTPException(status_code=500, detail="Database not found")
         
-        if total > 0:
-            completion = int((done / total) * 100)
-            # 目标完成度先固定为 80，可在前端设置或引入配置表扩展
-            print(f"今日完成：{completion}")
-            return {"today": completion}
-        else:
-            # 没有今日截止的任务，返回-1,前端处理
-            print("没有今日截止的任务")
-            return {"today": -1}
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # 统计今日截止的任务总数
+            total_row = conn.execute(
+                "SELECT COUNT(*) as count FROM tasks WHERE date(deadline) = date(?)",
+                (today,)
+            ).fetchone()
+            total = total_row["count"] if total_row else 0
+            
+            # 统计今日截止且已完成的任务数（注意：状态是 DONE，不是 done）
+            done_row = conn.execute(
+                "SELECT COUNT(*) as count FROM tasks WHERE date(deadline) = date(?) AND status = 'DONE'",
+                (today,)
+            ).fetchone()
+            done = done_row["count"] if done_row else 0
+            
+            print(f"📊 今日任务: 总数={total}, 完成={done}")
+            
+            if total > 0:
+                completion = int((done / total) * 100)
+                print(f"✅ 今日完成度: {completion}%")
+                return {"today": completion}
+            else:
+                print("⚠️  没有今日截止的任务")
+                return {"today": -1}
+                
+    except sqlite3.Error as e:
+        print(f"❌ 数据库查询失败: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except Exception as e:
+        print(f"❌ 获取今日完成度失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
-    get_progress_summary()
-    get_today_completion()
+    print(get_progress_summary())
+    print(get_today_completion())

@@ -59,21 +59,58 @@ frontend/build/
 *.db
 *.sqlite
 *.sqlite3
+backend/data/
+database.db
 
 # Logs
 *.log
 logs/
 
 # Environment variables
+.env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+!.env.example
+
+# Configuration files
+config.json
+config.yml
+config.yaml
+settings.json
+settings.yml
+*.config.js
+*.config.ts
+!vite.config.ts
+!vite.config.js
+!tsconfig.json
+backend/config/local.py
+backend/config/production.py
+backend/config/*.local.*
+
+# Secrets and credentials
+*.pem
+*.key
+*.cert
+*.crt
+secrets/
+credentials/
+*.secret
+
+# User-specific files
+user_data/
+user_config/
+*.user
+.user.*
 
 # Temporary files
 *.tmp
 *.temp
 .cache/
+temp/
+tmp/
 
 # Coverage reports
 htmlcov/
@@ -93,3 +130,32 @@ coverage.xml
 # Backup files
 *.backup
 *.bak
+*~
+
+# Large files
+*.mp4
+*.avi
+*.mov
+*.zip
+*.tar.gz
+*.rar
+
+# API keys and tokens
+api_keys.txt
+tokens.txt
+.secrets
+
+# Local development files
+local_settings.py
+dev_config.py
+test_data/
+mock_data/
+
+# Build files (但保留 build.bat 和 build_config.spec)
+# build.bat
+# build_config.spec
+# 或者使用例外规则：
+*.bat
+!build.bat
+*.spec
+!build_config.spec

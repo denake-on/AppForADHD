@@ -35,9 +35,6 @@ class HierarchicalTask(BaseModel):
 # 解决递归模型问题
 HierarchicalTask.model_rebuild()
 
-# 为类型注解导入
-from typing import List as ListType
-
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 
@@ -50,113 +47,154 @@ def read_tasks(
     search: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """
-    获取任务列表
-    """
-    tasks = crud.get_tasks(
-        db, 
-        skip=skip, 
-        limit=limit, 
-        status=status, 
-        priority=priority, 
-        search=search
-    )
-    
-    # 将SQLAlchemy模型转换为字典，以便FastAPI正确序列化
-    tasks_data = []
-    for task in tasks:
-        task_dict = {
-            "id": task.id,
-            "title": task.title,
-            "description": task.description,
-            "status": task.status.value,
-            "priority": task.priority.value,
-            "dueDate": task.deadline.isoformat() if task.deadline else None,
-            "createdAt": task.created_at.isoformat(),
-            "updatedAt": task.updated_at.isoformat(),
-            "progressPercent": task.progress_percent,
-            "level": task.level,
-            "parent_id": task.parent_id,
-            # 添加一个字段表示该任务是否属于已完成的组（即其level 1父任务是否已完成）
-            "isInCompletedGroup": crud.is_task_in_completed_group(db, task.id)
-        }
-        tasks_data.append(task_dict)
-    print("调用routes.py的read_tasks成功") #调试
-    return tasks_data
+    """获取任务列表"""
+    try:
+        tasks = crud.get_tasks(
+            db, 
+            skip=skip, 
+            limit=limit, 
+            status=status, 
+            priority=priority, 
+            search=search
+        )
+        
+        # 将SQLAlchemy模型转换为字典
+        tasks_data = []
+        for task in tasks:
+            task_dict = {
+                "id": task.id,
+                "title": task.title,
+                "description": task.description,
+                "status": task.status.value,
+                "priority": task.priority.value,
+                "dueDate": task.deadline.isoformat() if task.deadline else None,
+                "createdAt": task.created_at.isoformat(),
+                "updatedAt": task.updated_at.isoformat(),
+                "progressPercent": task.progress_percent,
+                "level": task.level,
+                "parent_id": task.parent_id,
+                "isInCompletedGroup": crud.is_task_in_completed_group(db, task.id)
+            }
+            tasks_data.append(task_dict)
+        
+        print(f"✅ read_tasks: 返回 {len(tasks_data)} 个任务")
+        return tasks_data
+    except Exception as e:
+        print(f"❌ read_tasks 错误: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 
-@router.get("/hierarchical", response_model=List[HierarchicalTask])
+@router.get("/hierarchical", response_model=List[dict])
 def read_tasks_hierarchical(
     status: Optional[TaskStatus] = Query(None),
     priority: Optional[TaskPriority] = Query(None),
     search: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    print("调用routes.py的read_tasks_hierarchical成功") #调试
-    """
-    获取层级结构的任务列表（以level 1的任务为根节点）
-    """
-    # 获取所有任务，应用过滤器
-    all_tasks = crud.get_tasks(
-        db, 
-        skip=0, 
-        limit=1000,  # 设置足够大的limit获取所有任务
-        status=status,
-        priority=priority,
-        search=search
-    )
-    
-    # 构建层级结构
-    task_dict = {}
-    root_tasks = []
-    
-    # 创建任务字典，便于查找
-    for task in all_tasks:
-        task_data = {
-            "id": task.id,
-            "title": task.title,
-            "description": task.description,
-            "status": task.status.value,
-            "priority": task.priority.value,
-            "dueDate": task.deadline.isoformat() if task.deadline else None,
-            "createdAt": task.created_at.isoformat(),
-            "updatedAt": task.updated_at.isoformat(),
-            "progressPercent": task.progress_percent,
-            "level": task.level,
-            "parent_id": task.parent_id,
-            "children": [],  # 子任务列表
-            # 添加一个字段表示该任务是否属于已完成的组（即其level 1父任务是否已完成）
-            "isInCompletedGroup": crud.is_task_in_completed_group(db, task.id)
-        }
-        task_dict[task.id] = task_data
-    
-    # 构建层级关系
-    for task_data in task_dict.values():
-        parent_id = task_data["parent_id"]
-        if parent_id is None or parent_id not in task_dict:
-            # 没有父任务，是根任务（level 1）
-            root_tasks.append(task_data)
-        else:
-            # 有父任务，将其添加到父任务的children中
-            parent_task = task_dict[parent_id]
-            parent_task["children"].append(task_data)
-    
-    # 按层级和创建时间排序
-    def sort_tasks(task_list):
-        # 按层级和创建时间排序
-        task_list.sort(key=lambda x: (x["level"], x["createdAt"] if x["createdAt"] else ""))
-        for task in task_list:
-            sort_tasks(task["children"])  # 递排序子任务
-    
-    sort_tasks(root_tasks)
-    return root_tasks
+    """获取层级结构的任务列表"""
+    try:
+        print("📝 调用 read_tasks_hierarchical")
+        
+        # 获取所有任务
+        all_tasks = crud.get_tasks(
+            db, 
+            skip=0, 
+            limit=1000,
+            status=status,
+            priority=priority,
+            search=search
+        )
+        
+        if not all_tasks:
+            print("⚠️  没有任务数据")
+            return []
+        
+        # 构建任务字典
+        task_dict = {}
+        for task in all_tasks:
+            task_dict[task.id] = {
+                "id": task.id,
+                "title": task.title,
+                "description": task.description,
+                "status": task.status.value,
+                "priority": task.priority.value,
+                "dueDate": task.deadline.isoformat() if task.deadline else None,
+                "createdAt": task.created_at.isoformat(),
+                "updatedAt": task.updated_at.isoformat(),
+                "progressPercent": task.progress_percent,
+                "level": task.level,
+                "parent_id": task.parent_id,
+                "children": [],
+                "isInCompletedGroup": crud.is_task_in_completed_group(db, task.id)
+            }
+        
+        # 构建层级关系
+        root_tasks = []
+        for task_data in task_dict.values():
+            parent_id = task_data["parent_id"]
+            if parent_id is None or parent_id not in task_dict:
+                root_tasks.append(task_data)
+            else:
+                task_dict[parent_id]["children"].append(task_data)
+        
+        # 排序
+        def sort_tasks(task_list):
+            task_list.sort(key=lambda x: (x["level"], x["createdAt"]))
+            for task in task_list:
+                sort_tasks(task["children"])
+        
+        sort_tasks(root_tasks)
+        
+        print(f"✅ read_tasks_hierarchical: 返回 {len(root_tasks)} 个顶级任务")
+        return root_tasks
+        
+    except Exception as e:
+        print(f"❌ read_tasks_hierarchical 错误: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+
+@router.get("/urgent", response_model=List[dict])
+def get_urgent_tasks(
+    limit: int = Query(10, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    """获取紧急任务列表"""
+    try:
+        tasks = db.query(Task).filter(
+            Task.status != TaskStatus.DONE,
+            Task.level == 1
+        ).order_by(
+            Task.deadline.asc(),
+            Task.progress_percent.asc()
+        ).limit(limit).all()
+        
+        result = []
+        for task in tasks:
+            result.append({
+                "id": task.id,
+                "title": task.title,
+                "deadline": task.deadline.isoformat() if task.deadline else None,
+                "status": task.status.value,
+                "progress": task.progress_percent,
+                "level": task.level,
+                "priority": task.priority.value
+            })
+        
+        print(f"✅ get_urgent_tasks: 返回 {len(result)} 个紧急任务")
+        return result
+        
+    except Exception as e:
+        print(f"❌ get_urgent_tasks 错误: {str(e)}")
+        return []
 
 
 @router.get("/{task_id}", response_model=dict)
 def read_task(task_id: int, db: Session = Depends(get_db)):
-    """
-    获取单个任务
-    """
+    """获取单个任务"""
     task = crud.get_task(db, task_id=task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -174,74 +212,20 @@ def read_task(task_id: int, db: Session = Depends(get_db)):
         "level": task.level,
         "parent_id": task.parent_id
     }
-    # 获取所有任务，应用过滤器
-    all_tasks = crud.get_tasks(
-        db, 
-        skip=0, 
-        limit=1000,  # 设置足够大的limit获取所有任务
-        status=status,
-        priority=priority,
-        search=search
-    )
-    
-    # 构建层级结构
-    task_dict = {}
-    root_tasks = []
-    
-    # 创建任务字典，便于查找
-    for task in all_tasks:
-        task_data = {
-            "id": task.id,
-            "title": task.title,
-            "description": task.description,
-            "status": task.status.value,
-            "priority": task.priority.value,
-            "dueDate": task.deadline.isoformat() if task.deadline else None,
-            "createdAt": task.created_at.isoformat(),
-            "updatedAt": task.updated_at.isoformat(),
-            "progressPercent": task.progress_percent,
-            "level": task.level,
-            "parent_id": task.parent_id,
-            "children": []  # 子任务列表
-        }
-        task_dict[task.id] = task_data
-    
-    # 构建层级关系
-    for task_data in task_dict.values():
-        parent_id = task_data["parent_id"]
-        if parent_id is None or parent_id not in task_dict:
-            # 没有父任务，是根任务（level 1）
-            root_tasks.append(task_data)
-        else:
-            # 有父任务，将其添加到父任务的children中
-            parent_task = task_dict[parent_id]
-            parent_task["children"].append(task_data)
-    
-    # 按层级和创建时间排序
-    def sort_tasks(task_list):
-        # 按层级和创建时间排序
-        task_list.sort(key=lambda x: (x["level"], x["createdAt"] if x["createdAt"] else ""))
-        for task in task_list:
-            sort_tasks(task["children"])  # 递排序子任务
-    
-    sort_tasks(root_tasks)
-    return root_tasks
 
 
 @router.post("/", response_model=dict)
 def create_task(
     title: str = Query(..., min_length=1, max_length=255),
     description: Optional[str] = Query(None, max_length=2000),
-    deadline: Optional[str] = Query(None),  # 日期格式为YYYY-MM-DD
+    deadline: Optional[str] = Query(None),
     priority: TaskPriority = Query(TaskPriority.MEDIUM),
     parent_id: Optional[int] = Query(None),
     level: int = Query(1, ge=1),
     db: Session = Depends(get_db)
 ):
-    print("调用routes.py的create_task成功") #调试
-    """
-    创建新任务
-    """
+    """创建新任务"""
+    print(f"📝 create_task: {title}")
     from datetime import datetime
     
     deadline_date = None
@@ -284,7 +268,7 @@ def update_task(
     task_id: int,
     title: Optional[str] = Query(None, min_length=1, max_length=255),
     description: Optional[str] = Query(None, max_length=2000),
-    deadline: Optional[str] = Query(None),  # 日期格式为YYYY-MM-DD
+    deadline: Optional[str] = Query(None),
     priority: Optional[TaskPriority] = Query(None),
     status: Optional[TaskStatus] = Query(None),
     progress_percent: Optional[int] = Query(None, ge=0, le=100),
@@ -292,10 +276,7 @@ def update_task(
     level: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db)
 ):
-    print("调用routes.py的update_task成功") #调试
-    """
-    更新任务
-    """
+    """更新任务"""
     from datetime import datetime
     
     deadline_date = None
@@ -341,10 +322,7 @@ def update_task(
 
 @router.delete("/{task_id}", response_model=dict)
 def delete_task(task_id: int, db: Session = Depends(get_db)):
-    print("调用routes.py的delete_task成功") #调试
-    """
-    删除任务
-    """
+    """删除任务"""
     success = crud.delete_task(db, task_id=task_id)
     if not success:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -358,10 +336,7 @@ def update_task_status(
     status: TaskStatus,
     db: Session = Depends(get_db)
 ):
-    print("调用routes.py的update_task_status成功") #调试
-    """
-    更新任务状态，如果父任务完成则自动完成所有子任务
-    """
+    """更新任务状态"""
     task = crud.update_task_status_with_children(db, task_id=task_id, status=status)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -387,18 +362,12 @@ def update_task_status_with_descendants(
     status: TaskStatus,
     db: Session = Depends(get_db)
 ):
-    print("调用routes.py的update_task_status_with_descendants成功") #调试
-    """
-    更新任务状态及其所有后代任务的状态（递归更新）
-    """
+    """更新任务状态及其所有后代任务"""
     task = crud.get_task(db, task_id=task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    # 更新当前任务状态
     task.status = status
-    
-    # 获取所有后代任务并更新它们的状态
     descendants = crud.get_all_descendants(db, task_id)
     for descendant in descendants:
         descendant.status = status
@@ -427,15 +396,11 @@ def breakdown_task(
     prompt: str = Query(..., min_length=1),
     db: Session = Depends(get_db)
 ):
-    """
-    AI拆解任务 - 使用OpenRouter API进行智能任务拆解
-    """
-    # 获取任务信息
+    """AI拆解任务"""
     task = crud.get_task(db, task_id=task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    # 构建任务信息字典
     task_info = {
         "id": task.id,
         "title": task.title,
@@ -446,22 +411,12 @@ def breakdown_task(
         "deadline": task.deadline.isoformat() if task.deadline else "无截止日期"
     }
     
-    # 打印原始请求信息
     print("\n" + "="*80)
     print("AI拆解任务请求")
-    print("="*80)
-    print(f"任务ID: {task.id}")
-    print(f"任务标题: {task.title}")
-    print(f"任务描述: {task.description}")
-    print(f"任务层级: Level {task.level}")
-    print(f"任务状态: {task.status.value}")
-    print(f"任务优先级: {task.priority.value}")
-    print(f"截止日期: {task.deadline.isoformat() if task.deadline else '无'}")
-    print("-"*80)
-    print(f"拆解提示词:\n{prompt}")
+    print(f"任务ID: {task.id}, 标题: {task.title}")
+    print(f"提示词: {prompt}")
     print("="*80 + "\n")
     
-    # 调用AI拆解服务
     try:
         breakdown_tasks = breakdown_service.breakdown_task(task_info, prompt)
         
@@ -478,25 +433,17 @@ def breakdown_task(
         else:
             return {
                 "success": False,
-                "message": "AI拆解失败，请稍后重试",
+                "message": "AI拆解失败",
                 "task_id": task.id,
-                "task_title": task.title,
-                "prompt": prompt,
-                "breakdown_tasks": [],
-                "subtask_count": 0
+                "breakdown_tasks": []
             }
-        
     except Exception as e:
-        print(f"❌ 拆解过程中发生错误: {str(e)}")
+        print(f"❌ 拆解错误: {str(e)}")
         return {
             "success": False,
-            "message": "AI拆解失败，请稍后重试",
-            "task_id": task.id,
-            "task_title": task.title,
-            "prompt": prompt,
+            "message": "AI拆解失败",
             "error": str(e),
-            "breakdown_tasks": [],
-            "subtask_count": 0
+            "breakdown_tasks": []
         }
 
 
@@ -506,10 +453,7 @@ def confirm_breakdown_tasks(
     subtasks: List[dict],
     db: Session = Depends(get_db)
 ):
-    """
-    确认并保存AI拆解的子任务
-    """
-    # 获取父任务信息
+    """确认并保存AI拆解的子任务"""
     parent_task = crud.get_task(db, task_id=task_id)
     if parent_task is None:
         raise HTTPException(status_code=404, detail="Parent task not found")
@@ -518,16 +462,14 @@ def confirm_breakdown_tasks(
         created_tasks = []
         
         for subtask_data in subtasks:
-            # 解析截止日期
             deadline_date = None
             if subtask_data.get('deadline'):
                 try:
                     from datetime import datetime
                     deadline_date = datetime.strptime(subtask_data['deadline'], "%Y-%m-%d").date()
                 except ValueError:
-                    print(f"⚠️ 无效的截止日期格式: {subtask_data['deadline']}")
+                    pass
             
-            # 映射优先级
             priority_map = {
                 'high': TaskPriority.HIGH,
                 'medium': TaskPriority.MEDIUM,
@@ -535,7 +477,6 @@ def confirm_breakdown_tasks(
             }
             priority = priority_map.get(subtask_data.get('priority', 'medium'), TaskPriority.MEDIUM)
             
-            # 创建子任务
             db_subtask = crud.create_task(
                 db,
                 title=subtask_data['title'],
@@ -549,11 +490,7 @@ def confirm_breakdown_tasks(
             created_tasks.append({
                 "id": db_subtask.id,
                 "title": db_subtask.title,
-                "description": db_subtask.description,
-                "deadline": db_subtask.deadline.isoformat() if db_subtask.deadline else None,
-                "priority": db_subtask.priority.value,
-                "level": db_subtask.level,
-                "parent_id": db_subtask.parent_id
+                "level": db_subtask.level
             })
         
         print(f"✅ 成功创建 {len(created_tasks)} 个子任务")
@@ -564,7 +501,6 @@ def confirm_breakdown_tasks(
             "parent_task_id": task_id,
             "created_tasks": created_tasks
         }
-        
     except Exception as e:
-        print(f"❌ 创建子任务时发生错误: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"创建子任务失败: {str(e)}")
+        print(f"❌ 创建子任务错误: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
