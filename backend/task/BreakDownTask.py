@@ -7,9 +7,9 @@ import os
 class TaskBreakdownService:
     def __init__(self):
         # OpenRouter API配置
-        self.api_key = os.getenv('OPENROUTER_API_KEY', 'your_openrouter_api_key')
+        self.api_key = os.getenv('OPENROUTER_API_KEY', 'your_default_api_key_here')
         self.base_url = "https://openrouter.ai/api/v1/chat/completions"
-        self.model = "qwen/qwen3-235b-a22b-2507"  # 使用Qwen 3模型
+        self.model = "tngtech/deepseek-r1t-chimera:free"
         
     def call_openrouter_api(self, prompt: str, task_info: Dict[str, Any]) -> str:
         """
@@ -80,7 +80,7 @@ class TaskBreakdownService:
 2. 考虑任务之间的依赖关系，合理安排截止日期
 3. 根据子任务的重要性和紧急性设置优先级
 4. 以JSON格式返回，包含title、description、deadline和priority字段
-5. 请严格遵守JSON格式，不要添加任何其他内容,千万千万不要返回其他任何内容
+5. 请严格遵守JSON格式，不要添加任何其他内容,禁止返回其他任何内容和错误格式
 """
 
         # 构建请求数据
@@ -146,12 +146,6 @@ class TaskBreakdownService:
             # 清理响应内容
             cleaned_response = api_response.strip()
             
-            # 尝试直接解析JSON
-            if cleaned_response.startswith('['):
-                result = json.loads(cleaned_response)
-                print(f"✅ 直接解析成功，获得 {len(result)} 个子任务")
-                return result
-            
             # 尝试提取JSON部分 - 使用更宽松的正则表达式
             patterns = [
                 r'\[.*?\]',  # 标准JSON数组
@@ -171,6 +165,27 @@ class TaskBreakdownService:
                     except json.JSONDecodeError as e:
                         print(f"⚠️ 模式{i+1}解析失败: {str(e)}")
                         continue
+                    
+            # 尝试直接解析JSON
+            if cleaned_response.startswith('['):
+                # 找到第一个完整的JSON数组结束位置
+                bracket_count = 0
+                end_idx = -1
+                for i, char in enumerate(cleaned_response):
+                    if char == '[':
+                        bracket_count += 1
+                    elif char == ']':
+                        bracket_count -= 1
+                        if bracket_count == 0:
+                            end_idx = i + 1
+                            break
+                
+                if end_idx > 0:
+                    json_str = cleaned_response[:end_idx]
+                    print(f"🔍 提取JSON数组，长度: {len(json_str)}")
+                    result = json.loads(json_str)
+                    print(f"✅ 直接解析成功，获得 {len(result)} 个子任务")
+                    return result
             
             # 尝试修复截断的JSON
             print("🔧 尝试修复截断的JSON...")
