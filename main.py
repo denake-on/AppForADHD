@@ -10,13 +10,15 @@ import sqlite3
 
 app = FastAPI()
 
+# 导入统一的路径函数
+from backend.database.init_db import get_db_path
+
 try:
     from backend.database.init_db import init_database
     init_database()
-    print("✅ 数据库初始化完成")
+    print(f"✅ 数据库初始化完成: {get_db_path()}")
 except Exception as e:
     print(f"❌ 数据库初始化失败: {e}")
-    import traceback
     traceback.print_exc()
 
 # 添加全局异常处理
@@ -45,41 +47,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 获取数据库路径
-def get_db_path():
-    """获取数据库路径"""
-    if getattr(sys, 'frozen', False):
-        # 打包后的路径
-        base_path = Path(sys._MEIPASS)
-    else:
-        # 开发环境路径
-        base_path = Path(__file__).parent
-    
-    return base_path / "backend" / "data" / "database.db"
 
-# 获取前端文件路径
 def get_frontend_path():
     """获取前端文件路径"""
     if getattr(sys, 'frozen', False):
         # 打包后的路径
-        return Path(sys._MEIPASS) / 'frontend' / 'dist'
+        if hasattr(sys, '_MEIPASS'):
+            # PyInstaller 临时目录
+            return Path(sys._MEIPASS) / 'frontend' / 'dist'
+        else:
+            # exe 所在目录
+            return Path(sys.executable).parent / 'frontend' / 'dist'
     else:
         # 开发环境路径
         project_root = Path(__file__).parent
-        # 优先使用构建后的 dist 目录
         dist_path = project_root / 'frontend' / 'dist'
         if dist_path.exists():
             return dist_path
-        # 否则返回 frontend 根目录
         return project_root / 'frontend'
+
 
 # 挂载静态文件
 frontend_path = get_frontend_path()
 print(f"🔍 前端路径: {frontend_path}")
 print(f"🔍 路径是否存在: {frontend_path.exists()}")
+print(f"🔍 是否打包: {getattr(sys, 'frozen', False)}")
+print(f"🔍 数据库路径: {get_db_path()}")
 
 if frontend_path.exists():
-    # 挂载所有静态资源
     app.mount("/assets", StaticFiles(directory=frontend_path / "assets"), name="assets")
 else:
     print(f"⚠️  警告: 前端目录不存在: {frontend_path}")
@@ -101,6 +96,9 @@ try:
     print("✅ 已加载 greeting 路由")
 except ImportError as e:
     print(f"⚠️  未找到 greeting 路由: {e}")
+except Exception as e:
+    print(f"❌ 加载 greeting 路由失败: {e}")
+    traceback.print_exc()
 
 try:
     from backend.welcomePage.my_calendar import router as calendar_router
@@ -108,6 +106,9 @@ try:
     print("✅ 已加载 calendar 路由")
 except ImportError as e:
     print(f"⚠️  未找到 calendar 路由: {e}")
+except Exception as e:
+    print(f"❌ 加载 calendar 路由失败: {e}")
+    traceback.print_exc()
 
 try:
     from backend.welcomePage.progress import router as progress_router
@@ -115,6 +116,9 @@ try:
     print("✅ 已加载 progress 路由")
 except ImportError as e:
     print(f"⚠️  未找到 progress 路由: {e}")
+except Exception as e:
+    print(f"❌ 加载 progress 路由失败: {e}")
+    traceback.print_exc()
 
 try:
     from backend.welcomePage.tasks import router as welcome_tasks_router
@@ -122,6 +126,10 @@ try:
     print("✅ 已加载 welcome tasks 路由")
 except ImportError as e:
     print(f"⚠️  未找到 welcome tasks 路由: {e}")
+except Exception as e:
+    print(f"❌ 加载 welcome tasks 路由失败: {e}")
+    traceback.print_exc()
+
 
 @app.get("/")
 async def read_root():
@@ -132,7 +140,8 @@ async def read_root():
         return {
             "error": "前端文件不存在", 
             "path": str(frontend_path),
-            "cwd": os.getcwd()
+            "cwd": os.getcwd(),
+            "frozen": getattr(sys, 'frozen', False)
         }
     
     if not index_path.exists():
@@ -144,14 +153,19 @@ async def read_root():
     
     return FileResponse(index_path)
 
+
 @app.get("/api/health")
 async def health_check():
     """健康检查接口"""
     return {
         "status": "ok",
         "frontend_path": str(frontend_path),
-        "frontend_exists": frontend_path.exists()
+        "frontend_exists": frontend_path.exists(),
+        "database_path": str(get_db_path()),
+        "database_exists": get_db_path().exists(),
+        "frozen": getattr(sys, 'frozen', False)
     }
+
 
 @app.get("/api/debug/routes")
 async def debug_routes():
@@ -165,6 +179,7 @@ async def debug_routes():
                 "name": route.name
             })
     return {"routes": routes}
+
 
 @app.get("/api/completion")
 async def get_completion():
@@ -214,6 +229,7 @@ async def get_completion():
         traceback.print_exc()
         return {"todo": 0, "in_progress": 0, "done": 0, "cancelled": 0}
 
+
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
     """处理前端路由"""
@@ -234,6 +250,7 @@ async def serve_frontend(full_path: str):
         "requested": full_path
     }
 
+
 if __name__ == "__main__":
     import uvicorn
     import webbrowser
@@ -250,6 +267,10 @@ if __name__ == "__main__":
     
     print("=" * 50)
     print("🚀 AppForADHD 启动中...")
+    print("=" * 50)
+    print(f"📂 数据库路径: {get_db_path()}")
+    print(f"📂 前端路径: {frontend_path}")
+    print(f"🔧 打包模式: {getattr(sys, 'frozen', False)}")
     print("=" * 50)
     
     browser_thread = threading.Thread(target=open_browser, daemon=True)

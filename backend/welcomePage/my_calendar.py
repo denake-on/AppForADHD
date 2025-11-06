@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+import os
 from datetime import date
 from typing import Dict, List, Any
 import sqlite3
@@ -8,6 +10,19 @@ from pathlib import Path
 from fastapi import APIRouter, Query, HTTPException
 
 router = APIRouter(tags=["calendar"])
+
+
+def get_db_path():
+    """获取数据库路径（与 init_db.py 保持一致）"""
+    if getattr(sys, 'frozen', False):
+        # 打包后使用用户目录
+        app_data = Path(os.getenv('APPDATA')) / 'AppForADHD'
+        app_data.mkdir(parents=True, exist_ok=True)
+        return app_data / "database.db"
+    else:
+        # 开发环境
+        base_path = Path(__file__).resolve().parents[1]
+        return base_path / "data" / "database.db"
 
 
 @router.get("")
@@ -36,8 +51,8 @@ def get_calendar(
         else:
             next_month_start = month_start.replace(month=month_start.month + 1)
 
-        # 直接从 SQLite 读取
-        db_path = Path(__file__).resolve().parents[1] / "data" / "database.db"
+        # 使用统一的数据库路径
+        db_path = get_db_path()
         
         if not db_path.exists():
             print(f"❌ 数据库文件不存在: {db_path}")

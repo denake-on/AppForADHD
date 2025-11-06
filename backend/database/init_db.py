@@ -1,5 +1,6 @@
 """数据库初始化模块"""
 import sys
+import os
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -7,18 +8,21 @@ from datetime import datetime, timedelta
 def get_db_path():
     """获取数据库路径"""
     if getattr(sys, 'frozen', False):
-        # 打包后的路径
-        base_path = Path(sys._MEIPASS)
+        # 打包后使用用户目录
+        app_data = Path(os.getenv('APPDATA')) / 'AppForADHD'
+        app_data.mkdir(parents=True, exist_ok=True)
+        db_path = app_data / "database.db"
     else:
-        # 开发环境路径
+        # 开发环境
         base_path = Path(__file__).resolve().parents[1]
-    
-    db_path = base_path / "data" / "database.db"
+        db_path = base_path / "data" / "database.db"
     
     # 确保数据目录存在
     db_path.parent.mkdir(parents=True, exist_ok=True)
     
+    print(f"📂 数据库路径: {db_path}")
     return db_path
+
 
 
 def init_database():

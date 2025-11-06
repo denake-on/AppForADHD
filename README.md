@@ -71,6 +71,9 @@ scripts/
 └── requirements.txt       # Python依赖列表
 ```
 
+### 打包过程
+在命令行主目录AppForADHD下输入./build.bat
+
 ## 环境要求
 
 - Python 3.8+

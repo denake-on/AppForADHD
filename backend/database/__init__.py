@@ -1,15 +1,16 @@
 """数据库模块"""
 import sys
+import os
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
 
-from .init_db import init_database, get_db_path
+from .init_db import get_db_path
 
 # 先创建 Base
 Base = declarative_base()
 
-# 获取数据库路径
+# 获取数据库路径（使用统一的 get_db_path 函数）
 DB_PATH = get_db_path()
 
 # 创建 SQLAlchemy engine
@@ -40,8 +41,7 @@ from backend.models import Task, TaskStatus, TaskPriority
 Base.metadata.create_all(bind=engine)
 
 __all__ = [
-    'init_database', 
-    'get_db_path', 
+    'get_db_path',
     'get_db', 
     'engine', 
     'SessionLocal', 

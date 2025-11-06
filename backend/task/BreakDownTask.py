@@ -152,7 +152,6 @@ class TaskBreakdownService:
 
         print(f"🔍 发送请求到 OpenRouter API")
         print(f"🔍 模型: {self.model}")
-        print(f"🔍 API Key: {self.api_key[:10]}...{self.api_key[-4:]}")
 
         try:
             # 发送请求

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import sys
 from typing import Dict, Any
 from datetime import date
 import sqlite3
@@ -10,11 +12,25 @@ from fastapi import APIRouter, HTTPException
 router = APIRouter(tags=["progress"])
 
 
+def get_db_path():
+    """获取数据库路径（与 init_db.py 保持一致）"""
+    if getattr(sys, 'frozen', False):
+        # 打包后使用用户目录
+        app_data = Path(os.getenv('APPDATA')) / 'AppForADHD'
+        app_data.mkdir(parents=True, exist_ok=True)
+        return app_data / "database.db"
+    else:
+        # 开发环境
+        base_path = Path(__file__).resolve().parents[1]
+        return base_path / "data" / "database.db"
+
+
 @router.get("")
 def get_progress_summary() -> Dict[str, Any]:
     """统计每种状态的数量用于饼图显示"""
     try:
-        db_path = Path(__file__).resolve().parents[1] / "data" / "database.db"
+        # 使用 get_db_path() 函数，而不是硬编码路径
+        db_path = get_db_path()
         
         if not db_path.exists():
             print(f"❌ 数据库文件不存在: {db_path}")
@@ -82,7 +98,8 @@ def get_today_completion() -> Dict[str, int]:
         today = date.today().isoformat()
         print(f"📅 查询今日完成度: {today}")
         
-        db_path = Path(__file__).resolve().parents[1] / "data" / "database.db"
+        # 使用 get_db_path() 函数
+        db_path = get_db_path()
         
         if not db_path.exists():
             print(f"❌ 数据库文件不存在: {db_path}")
@@ -98,7 +115,7 @@ def get_today_completion() -> Dict[str, int]:
             ).fetchone()
             total = total_row["count"] if total_row else 0
             
-            # 统计今日截止且已完成的任务数（注意：状态是 DONE，不是 done）
+            # 统计今日截止且已完成的任务数
             done_row = conn.execute(
                 "SELECT COUNT(*) as count FROM tasks WHERE date(deadline) = date(?) AND status = 'DONE'",
                 (today,)
@@ -126,5 +143,6 @@ def get_today_completion() -> Dict[str, int]:
 
 
 if __name__ == "__main__":
+    print(f"数据库路径: {get_db_path()}")
     print(get_progress_summary())
     print(get_today_completion())
